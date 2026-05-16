@@ -3,6 +3,9 @@ import {View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch} from 'reac
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme, type Colors, type FontSizeKey} from '../theme/ThemeContext';
+import {useNavigation} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {RootStackParamList} from '../navigation/AppNavigator';
 
 const badges = ['🏆', '📅', '🐱', '🔍', '👑', '🎯'];
 
@@ -15,13 +18,25 @@ const FONT_SIZE_OPTIONS: {key: FontSizeKey; label: string; size: number}[] = [
 export default function ProfileScreen() {
   const [streak, setStreak] = useState(0);
   const [totalSolved] = useState(125);
+  const [hasToken, setHasToken] = useState(false);
   const insets = useSafeAreaInsets();
   const {colors, isDark, toggleTheme, fontScale, fontSizeKey, setFontSize} = useTheme();
   const styles = useMemo(() => makeStyles(colors, fontScale), [colors, fontScale]);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   useEffect(() => {
     AsyncStorage.getItem('streak').then(v => v && setStreak(parseInt(v, 10)));
+    AsyncStorage.getItem('accessToken').then(v => setHasToken(!!v));
   }, []);
+
+  const handleLogout = async () => {
+    await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+    setHasToken(false);
+  };
+
+  const handleLogin = () => {
+    navigation.navigate('Login');
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, {paddingTop: insets.top + 20}]}>
@@ -113,6 +128,17 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
+
+      {/* DEV ONLY */}
+      {hasToken ? (
+        <TouchableOpacity style={styles.devLogoutBtn} onPress={handleLogout}>
+          <Text style={styles.devLogoutText}>[DEV] 로그아웃</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity style={styles.devLoginBtn} onPress={handleLogin}>
+          <Text style={styles.devLoginText}>[DEV] 로그인하기</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }
@@ -188,5 +214,9 @@ function makeStyles(c: Colors, fs: number) {
     fontSizeBtnActive: {borderColor: '#2979FF', backgroundColor: c.isDark ? '#1A1F3A' : '#EEF2FF'},
     fontSizeBtnText: {color: c.subText, fontWeight: '600'},
     fontSizeBtnTextActive: {color: '#2979FF'},
+    devLogoutBtn: {marginTop: 24, alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8, borderWidth: 1, borderColor: '#FF5252'},
+    devLogoutText: {color: '#FF5252', fontSize: 13 * fs, fontWeight: '600'},
+    devLoginBtn: {marginTop: 24, alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8, borderWidth: 1, borderColor: '#2979FF'},
+    devLoginText: {color: '#2979FF', fontSize: 13 * fs, fontWeight: '600'},
   });
 }

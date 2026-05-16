@@ -1,9 +1,8 @@
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import {NavigationContainer, DefaultTheme, DarkTheme} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {Text} from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import HomeScreen from '../screens/HomeScreen';
 import StatsScreen from '../screens/StatsScreen';
@@ -67,17 +66,6 @@ function TabNavigator() {
 
 export default function AppNavigator() {
   const {colors, isDark} = useTheme();
-  const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
-
-  useEffect(() => {
-    AsyncStorage.getItem('accessToken').then(token => {
-      setInitialRoute(token ? 'Main' : 'Login');
-    });
-  }, []);
-
-  if (!initialRoute) {
-    return null;
-  }
 
   const baseTheme = isDark ? DarkTheme : DefaultTheme;
   const navTheme = {
@@ -95,7 +83,7 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer theme={navTheme}>
-      <Stack.Navigator screenOptions={{headerShown: false}} initialRouteName={initialRoute}>
+      <Stack.Navigator screenOptions={{headerShown: false}} initialRouteName="Main">
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Signup" component={SignupScreen} />
         <Stack.Screen name="Main" component={TabNavigator} />
