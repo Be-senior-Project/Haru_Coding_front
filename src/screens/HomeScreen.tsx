@@ -38,7 +38,7 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, {paddingTop: insets.top + 20}]}>
       <View style={styles.header}>
-        <Text style={styles.appName}>코드북극곰</Text>
+        <Text style={styles.appName}>하루코딩</Text>
         <View style={styles.streakBadge}>
           <Text style={styles.streakIcon}>🔥</Text>
           <Text style={styles.streakText}>{streak}일</Text>

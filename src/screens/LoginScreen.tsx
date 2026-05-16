@@ -18,6 +18,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme, type Colors} from '../theme/ThemeContext';
 import type {RootStackParamList} from '../navigation/AppNavigator';
 import {login, googleLogin} from '../api/authApi';
+// TODO: 백엔드 연동 시 실제 클라이언트 ID로 교체
 import {GOOGLE_WEB_CLIENT_ID} from '@env';
 
 GoogleSignin.configure({
@@ -140,6 +141,12 @@ export default function LoginScreen() {
             <Text style={styles.signupLinkBold}>회원가입</Text>
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.skipLink}
+          onPress={() => navigation.reset({index: 0, routes: [{name: 'Main'}]})}>
+          <Text style={styles.skipLinkText}>로그인 없이 둘러보기 →</Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -203,5 +210,7 @@ function makeStyles(c: Colors, fs: number) {
     signupLink: {marginTop: 'auto', alignItems: 'center'},
     signupLinkText: {fontSize: 14 * fs, color: c.subText},
     signupLinkBold: {color: '#2979FF', fontWeight: '700'},
+    skipLink: {marginTop: 12, alignItems: 'center'},
+    skipLinkText: {fontSize: 13 * fs, color: c.subText},
   });
 }
