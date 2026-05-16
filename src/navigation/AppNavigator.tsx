@@ -1,17 +1,22 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {NavigationContainer, DefaultTheme, DarkTheme} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {Text} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import HomeScreen from '../screens/HomeScreen';
 import StatsScreen from '../screens/StatsScreen';
 import ProblemBankScreen from '../screens/ProblemBankScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProblemSolveScreen from '../screens/ProblemSolveScreen';
+import LoginScreen from '../screens/LoginScreen';
+import SignupScreen from '../screens/SignupScreen';
 import {useTheme} from '../theme/ThemeContext';
 
 export type RootStackParamList = {
+  Login: undefined;
+  Signup: undefined;
   Main: undefined;
   ProblemSolve: {problemId: string};
 };
@@ -62,6 +67,17 @@ function TabNavigator() {
 
 export default function AppNavigator() {
   const {colors, isDark} = useTheme();
+  const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('accessToken').then(token => {
+      setInitialRoute(token ? 'Main' : 'Login');
+    });
+  }, []);
+
+  if (!initialRoute) {
+    return null;
+  }
 
   const baseTheme = isDark ? DarkTheme : DefaultTheme;
   const navTheme = {
@@ -79,7 +95,9 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer theme={navTheme}>
-      <Stack.Navigator screenOptions={{headerShown: false}}>
+      <Stack.Navigator screenOptions={{headerShown: false}} initialRouteName={initialRoute}>
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Signup" component={SignupScreen} />
         <Stack.Screen name="Main" component={TabNavigator} />
         <Stack.Screen name="ProblemSolve" component={ProblemSolveScreen} />
       </Stack.Navigator>
