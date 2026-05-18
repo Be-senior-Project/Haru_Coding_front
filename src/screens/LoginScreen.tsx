@@ -18,6 +18,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme, type Colors} from '../theme/ThemeContext';
 import type {RootStackParamList} from '../navigation/AppNavigator';
 import {login, googleLogin} from '../api/authApi';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 // TODO: 백엔드 연동 시 실제 클라이언트 ID로 교체
 import {GOOGLE_WEB_CLIENT_ID} from '@env';
 
@@ -84,7 +85,9 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.inner, {paddingTop: insets.top + 48}]}>
-        <Text style={styles.logo}>🐻‍❄️</Text>
+        <View style={styles.logoBox}>
+          <MaterialIcons name="code" size={48} color="#2979FF" />
+        </View>
         <Text style={styles.appName}>하루코딩</Text>
         <Text style={styles.tagline}>오늘도 한 문제씩</Text>
 
@@ -129,7 +132,8 @@ export default function LoginScreen() {
             style={[styles.googleBtn, loading && styles.btnDisabled]}
             onPress={handleGoogleLogin}
             disabled={loading}>
-            <Text style={styles.googleBtnText}>🔵  Google로 계속하기</Text>
+            <MaterialIcons name="g-translate" size={20} color="#4285F4" />
+            <Text style={styles.googleBtnText}>Google로 계속하기</Text>
           </TouchableOpacity>
         </View>
 
@@ -156,7 +160,7 @@ function makeStyles(c: Colors, fs: number) {
   return StyleSheet.create({
     container: {flex: 1, backgroundColor: c.bg},
     inner: {flex: 1, paddingHorizontal: 28, paddingBottom: 40},
-    logo: {fontSize: 56, textAlign: 'center', marginBottom: 8},
+    logoBox: {alignItems: 'center', marginBottom: 8},
     appName: {
       fontSize: 28 * fs,
       fontWeight: '800',
@@ -203,7 +207,10 @@ function makeStyles(c: Colors, fs: number) {
       borderColor: c.border,
       borderRadius: 12,
       paddingVertical: 15,
+      flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
     },
     googleBtnText: {color: c.text, fontWeight: '600', fontSize: 15 * fs},
     btnDisabled: {opacity: 0.6},

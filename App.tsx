@@ -8,7 +8,7 @@ export default function App() {
     <ThemeProvider>
       <SafeAreaProvider>
         <AppNavigator />
-      </SafeAreaProvider>
+      </SafeAreaProvider> 
     </ThemeProvider>
   );
 }

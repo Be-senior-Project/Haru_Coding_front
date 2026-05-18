@@ -2,7 +2,7 @@ import React from 'react';
 import {NavigationContainer, DefaultTheme, DarkTheme} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {Text} from 'react-native';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 import HomeScreen from '../screens/HomeScreen';
 import StatsScreen from '../screens/StatsScreen';
@@ -30,11 +30,11 @@ export type TabParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
-const TAB_ICONS: Record<string, string> = {
-  홈: '🏠',
-  통계: '📊',
-  '문제 은행': '📚',
-  '내 정보': '👤',
+const TAB_ICON_NAMES: Record<string, string> = {
+  홈: 'home',
+  통계: 'bar-chart',
+  '문제 은행': 'menu-book',
+  '내 정보': 'person',
 };
 
 function TabNavigator() {
@@ -42,8 +42,8 @@ function TabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({route}) => ({
-        tabBarIcon: ({focused}) => (
-          <Text style={{fontSize: focused ? 22 : 18}}>{TAB_ICONS[route.name]}</Text>
+        tabBarIcon: ({focused, color}) => (
+          <MaterialIcons name={TAB_ICON_NAMES[route.name]} size={focused ? 26 : 22} color={color} />
         ),
         tabBarActiveTintColor: '#2979FF',
         tabBarInactiveTintColor: '#9E9E9E',
