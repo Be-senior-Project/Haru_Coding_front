@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "be_senior_new",
-    "slug": "be_senior_new",
+    "name": "하루코딩",
+    "slug": "be-senior",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -16,6 +16,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.be_senior",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,6 +26,18 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "googleWebClientId": "164346625909-021m0jbdcf60ja0t63907btjvqlnmu63.apps.googleusercontent.com",
+      "apiUrl": "http://10.0.2.2:8080"
+    },
+    "plugins": [
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.PLACEHOLDER"
+        }
+      ]
+    ]
   }
 }
