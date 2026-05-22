@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+// 여기 또 에러 나고 있는데 무슨 일이야
 
 const BASE_URL = Constants.expoConfig?.extra?.apiUrl ?? 'http://localhost:8080';
 
