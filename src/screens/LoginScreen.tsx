@@ -13,17 +13,17 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {GoogleSignin, statusCodes} from '@react-native-google-signin/google-signin';
+// import {GoogleSignin, statusCodes} from '@react-native-google-signin/google-signin';
 import Constants from 'expo-constants';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {MaterialIcons} from '@expo/vector-icons';
 import {useTheme, type Colors} from '../theme/ThemeContext';
 import type {RootStackParamList} from '../navigation/AppNavigator';
-import {login, googleLogin} from '../api/authApi';
+// import {login, googleLogin} from '../api/authApi';
 
-GoogleSignin.configure({
-  webClientId: Constants.expoConfig?.extra?.googleWebClientId,
-});
+// GoogleSignin.configure({
+//   webClientId: Constants.expoConfig?.extra?.googleWebClientId,
+// });
 
 export default function LoginScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -43,21 +43,21 @@ export default function LoginScreen() {
     navigation.reset({index: 0, routes: [{name: 'Main'}]});
   };
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert('입력 오류', '이메일과 비밀번호를 입력해주세요.');
-      return;
-    }
-    setLoading(true);
-    try {
-      const {accessToken, refreshToken} = await login(email.trim(), password);
-      await saveTokensAndGoHome(accessToken, refreshToken);
-    } catch (e: any) {
-      Alert.alert('로그인 실패', e.message || '이메일 또는 비밀번호를 확인해주세요.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // const handleLogin = async () => {
+  //   if (!email.trim() || !password) {
+  //     Alert.alert('입력 오류', '이메일과 비밀번호를 입력해주세요.');
+  //     return;
+  //   }
+  //   setLoading(true);
+  //   try {
+  //     const {accessToken, refreshToken} = await login(email.trim(), password);
+  //     await saveTokensAndGoHome(accessToken, refreshToken);
+  //   } catch (e: any) {
+  //     Alert.alert('로그인 실패', e.message || '이메일 또는 비밀번호를 확인해주세요.');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -124,7 +124,7 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={[styles.loginBtn, loading && styles.btnDisabled]}
-            onPress={handleLogin}
+            // onPress={handleLogin}
             disabled={loading}>
             {loading ? (
               <ActivityIndicator color="#FFF" />
@@ -133,19 +133,19 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          <View style={styles.dividerRow}>
+          {/*<View style={styles.dividerRow}>*/}
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>또는</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          <TouchableOpacity
-            style={[styles.googleBtn, loading && styles.btnDisabled]}
-            onPress={handleGoogleLogin}
-            disabled={loading}>
-            <MaterialIcons name="g-translate" size={20} color="#4285F4" />
-            <Text style={styles.googleBtnText}>Google로 계속하기</Text>
-          </TouchableOpacity>
+          {/*<TouchableOpacity*/}
+          {/*  style={[styles.googleBtn, loading && styles.btnDisabled]}*/}
+          {/*  onPress={handleGoogleLogin}*/}
+          {/*  disabled={loading}>*/}
+          {/*  <MaterialIcons name="g-translate" size={20} color="#4285F4" />*/}
+          {/*  <Text style={styles.googleBtnText}>Google로 계속하기</Text>*/}
+          {/*</TouchableOpacity>*/}
         </View>
 
         <TouchableOpacity
@@ -162,7 +162,7 @@ export default function LoginScreen() {
           onPress={() => navigation.reset({index: 0, routes: [{name: 'Main'}]})}>
           <Text style={styles.skipLinkText}>로그인 없이 둘러보기 →</Text>
         </TouchableOpacity>
-      </View>
+      {/*</View>*/}
     </KeyboardAvoidingView>
   );
 }
