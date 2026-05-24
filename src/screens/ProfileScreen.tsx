@@ -1,28 +1,21 @@
-import React, {useEffect, useMemo, useState} from 'react';
-import {View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, Switch, ActivityIndicator,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme, type Colors, type FontSizeKey} from '../theme/ThemeContext';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../navigation/AppNavigator';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import {userApi, type UserProfile} from '../api/userApi';
 
-const BADGE_ICONS: {name: string; lib: 'mi' | 'mc'}[] = [
-  {name: 'emoji-events', lib: 'mi'},
-  {name: 'calendar-today', lib: 'mi'},
-  {name: 'pets', lib: 'mi'},
-  {name: 'search', lib: 'mi'},
-  {name: 'stars', lib: 'mi'},
-  {name: 'gps-fixed', lib: 'mi'},
-];
-
-const SETTINGS: {label: string; icon: string; lib: 'mi' | 'mc'}[] = [
-  {label: '프로필 수정', icon: 'edit', lib: 'mi'},
-  {label: '알림 설정', icon: 'notifications', lib: 'mi'},
-  {label: '서비스 약관', icon: 'description', lib: 'mi'},
-  {label: '로그아웃', icon: 'logout', lib: 'mi'},
+const BADGE_ICONS: {name: string}[] = [
+  {name: 'emoji-events'}, {name: 'calendar-today'}, {name: 'pets'},
+  {name: 'search'}, {name: 'stars'}, {name: 'gps-fixed'},
 ];
 
 const FONT_SIZE_OPTIONS: {key: FontSizeKey; label: string; size: number}[] = [
@@ -32,65 +25,92 @@ const FONT_SIZE_OPTIONS: {key: FontSizeKey; label: string; size: number}[] = [
 ];
 
 export default function ProfileScreen() {
-  const [streak, setStreak] = useState(0);
-  const [totalSolved] = useState(125);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [hasToken, setHasToken] = useState(false);
+  const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
   const {colors, isDark, toggleTheme, fontScale, fontSizeKey, setFontSize} = useTheme();
   const styles = useMemo(() => makeStyles(colors, fontScale), [colors, fontScale]);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  useEffect(() => {
-    AsyncStorage.getItem('streak').then(v => v && setStreak(parseInt(v, 10)));
-    AsyncStorage.getItem('accessToken').then(v => setHasToken(!!v));
-  }, []);
+  // 화면 포커스될 때마다 프로필 다시 로드
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, []),
+  );
+
+  const loadProfile = async () => {
+    const token = await AsyncStorage.getItem('accessToken');
+    setHasToken(!!token);
+    if (!token) return;
+
+    setLoading(true);
+    try {
+      const data = await userApi.getMe();
+      setProfile(data);
+    } catch (e) {
+      console.error('프로필 로드 실패', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
     setHasToken(false);
+    setProfile(null);
     navigation.reset({index: 0, routes: [{name: 'Login'}]});
   };
 
+  const xpProgress = profile ? (profile.xp % 100) : 0;
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, {paddingTop: insets.top + 20}]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, {paddingTop: insets.top + 20}]}>
+
+      {/* 프로필 카드 */}
       <View style={styles.profileCard}>
         <View style={styles.avatar}>
           <MaterialIcons name="person" size={48} color={colors.subText} />
-          {hasToken && (
+          {hasToken && profile && (
             <View style={styles.levelBadge}>
-              <Text style={styles.levelText}>lv.12</Text>
+              <Text style={styles.levelText}>lv.{profile.level}</Text>
             </View>
           )}
         </View>
 
-        {hasToken ? (
+        {loading ? (
+          <ActivityIndicator color="#2979FF" style={{marginTop: 12}} />
+        ) : hasToken && profile ? (
           <>
-            <Text style={styles.username}>홍길동</Text>
-            <Text style={styles.userLevel}>lv.12 중급</Text>
+            <Text style={styles.username}>{profile.nickname}</Text>
+            <Text style={styles.userLevel}>lv.{profile.level} · {getLevelLabel(profile.level)}</Text>
             <View style={styles.expBar}>
-              <View style={[styles.expFill, {width: '67%'}]} />
+              <View style={[styles.expFill, {width: `${xpProgress}%`}]} />
             </View>
-            <Text style={styles.expText}>EXP PROGRESS 67%</Text>
+            <Text style={styles.expText}>EXP {xpProgress}/100</Text>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <MaterialCommunityIcons name="fire" size={22} color="#E65100" />
                 <Text style={styles.statLabel}>연속 학습</Text>
-                <Text style={styles.statValue}>{streak}일</Text>
+                <Text style={styles.statValue}>{profile.streakDays}일</Text>
               </View>
               <View style={styles.statItem}>
                 <MaterialIcons name="edit-note" size={22} color="#2979FF" />
                 <Text style={styles.statLabel}>총 문제</Text>
-                <Text style={styles.statValue}>{totalSolved}개</Text>
-              </View>
-              <View style={styles.statItem}>
-                <MaterialIcons name="military-tech" size={22} color="#FF9800" />
-                <Text style={styles.statLabel}>랭킹</Text>
-                <Text style={styles.statValue}>25%</Text>
+                <Text style={styles.statValue}>{profile.totalSolved}개</Text>
               </View>
               <View style={styles.statItem}>
                 <MaterialIcons name="check-circle" size={22} color="#4CAF50" />
                 <Text style={styles.statLabel}>정답률</Text>
-                <Text style={styles.statValue}>88%</Text>
+                <Text style={styles.statValue}>{profile.accuracyRate}%</Text>
+              </View>
+              <View style={styles.statItem}>
+                <MaterialIcons name="military-tech" size={22} color="#FF9800" />
+                <Text style={styles.statLabel}>XP</Text>
+                <Text style={styles.statValue}>{profile.xp}</Text>
               </View>
             </View>
           </>
@@ -105,6 +125,7 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      {/* 업적 */}
       <Text style={styles.sectionTitle}>업적 및 배지</Text>
       {hasToken ? (
         <View style={styles.badgeRow}>
@@ -121,18 +142,27 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      {/* 설정 */}
       <Text style={styles.sectionTitle}>설정 및 관리</Text>
       <View style={styles.settingsCard}>
-        {SETTINGS.filter(item => item.label !== '로그아웃').map(item => (
-          <TouchableOpacity key={item.label} style={styles.settingRow}>
-            <MaterialIcons name={item.icon} size={20} color={colors.subText} style={styles.settingIcon} />
-            <Text style={styles.settingLabel}>{item.label}</Text>
-            <MaterialIcons name="chevron-right" size={20} color={colors.subText} />
-          </TouchableOpacity>
-        ))}
+        <TouchableOpacity style={styles.settingRow}>
+          <MaterialIcons name="edit" size={20} color={colors.subText} style={styles.settingIcon} />
+          <Text style={styles.settingLabel}>프로필 수정</Text>
+          <MaterialIcons name="chevron-right" size={20} color={colors.subText} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.settingRow}>
+          <MaterialIcons name="notifications" size={20} color={colors.subText} style={styles.settingIcon} />
+          <Text style={styles.settingLabel}>알림 설정</Text>
+          <MaterialIcons name="chevron-right" size={20} color={colors.subText} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.settingRow}>
+          <MaterialIcons name="description" size={20} color={colors.subText} style={styles.settingIcon} />
+          <Text style={styles.settingLabel}>서비스 약관</Text>
+          <MaterialIcons name="chevron-right" size={20} color={colors.subText} />
+        </TouchableOpacity>
         <View style={styles.settingRow}>
           <MaterialIcons name="dark-mode" size={20} color={colors.subText} style={styles.settingIcon} />
-          <Text style={styles.settingLabel}>다크모드 설정</Text>
+          <Text style={styles.settingLabel}>다크모드</Text>
           <Switch value={isDark} onValueChange={toggleTheme} />
         </View>
         <View style={styles.settingRow}>
@@ -144,14 +174,10 @@ export default function ProfileScreen() {
                 key={opt.key}
                 style={[styles.fontSizeBtn, fontSizeKey === opt.key && styles.fontSizeBtnActive]}
                 onPress={() => setFontSize(opt.key)}>
-                <Text
-                  style={[
-                    styles.fontSizeBtnText,
-                    {fontSize: opt.size},
-                    fontSizeKey === opt.key && styles.fontSizeBtnTextActive,
-                  ]}>
-                  가
-                </Text>
+                <Text style={[
+                  styles.fontSizeBtnText, {fontSize: opt.size},
+                  fontSizeKey === opt.key && styles.fontSizeBtnTextActive,
+                ]}>가</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -167,21 +193,20 @@ export default function ProfileScreen() {
   );
 }
 
+function getLevelLabel(level: number): string {
+  if (level < 5) return '입문자';
+  if (level < 10) return '초급자';
+  if (level < 20) return '중급자';
+  return '고급자';
+}
+
 function makeStyles(c: Colors, fs: number) {
   return StyleSheet.create({
     container: {flex: 1, backgroundColor: c.bg},
     content: {padding: 20, paddingBottom: 40},
     profileCard: {backgroundColor: c.card, borderRadius: 16, padding: 20, alignItems: 'center', marginBottom: 20, elevation: 2},
     avatar: {position: 'relative', marginBottom: 10},
-    levelBadge: {
-      position: 'absolute',
-      bottom: -4,
-      right: -4,
-      backgroundColor: '#2979FF',
-      borderRadius: 8,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-    },
+    levelBadge: {position: 'absolute', bottom: -4, right: -4, backgroundColor: '#2979FF', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2},
     levelText: {fontSize: 10, color: '#FFF', fontWeight: '700'},
     username: {fontSize: 20 * fs, fontWeight: '700', color: c.text},
     userLevel: {fontSize: 13 * fs, color: c.subText, marginBottom: 8},

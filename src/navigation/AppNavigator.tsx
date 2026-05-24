@@ -17,7 +17,8 @@ export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
   Main: undefined;
-  ProblemSolve: {problemId: string};
+  // 세트 ID + 문제 인덱스 전달 (단일 문제 → 세트 전체로 변경)
+  ProblemSolve: {setId: string; initialIndex?: number};
 };
 
 export type TabParamList = {
