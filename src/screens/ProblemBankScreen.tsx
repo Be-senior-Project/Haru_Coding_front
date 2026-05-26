@@ -4,7 +4,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../navigation/AppNavigator';
-import {mockProblems} from '../data/mockProblems';
+import {problemSets, type Problem} from '../data/mockProblems';
 import {useTheme, type Colors} from '../theme/ThemeContext';
 
 const DIFFICULTY_COLOR: Record<string, string> = {
@@ -20,6 +20,11 @@ const TYPE_LABEL: Record<string, string> = {
   short_answer: '단답형',
 };
 
+// 모든 세트에서 문제 flat하게 추출 + 세트 ID 매핑
+const allProblemsWithSetId = problemSets.flatMap(set =>
+  set.problems.map(p => ({...p, setId: set.id})),
+);
+
 export default function ProblemBankScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [selectedTopic, setSelectedTopic] = useState('전체');
@@ -30,45 +35,56 @@ export default function ProblemBankScreen() {
 
   const filtered =
     selectedTopic === '전체'
-      ? mockProblems
-      : mockProblems.filter(p => p.topic === selectedTopic);
+      ? allProblemsWithSetId
+      : allProblemsWithSetId.filter(p => p.topic === selectedTopic);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, {paddingTop: insets.top + 20}]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, {paddingTop: insets.top + 20}]}>
       <Text style={styles.title}>문제 은행</Text>
+
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
         {topics.map(t => (
           <TouchableOpacity
             key={t}
             style={[styles.filterBtn, selectedTopic === t && styles.filterActive]}
             onPress={() => setSelectedTopic(t)}>
-            <Text style={[styles.filterText, selectedTopic === t && styles.filterTextActive]}>{t}</Text>
+            <Text style={[styles.filterText, selectedTopic === t && styles.filterTextActive]}>
+              {t}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {filtered.map(p => (
-        <TouchableOpacity
-          key={p.id}
-          style={styles.problemCard}
-          onPress={() => navigation.navigate('ProblemSolve', {problemId: p.id})}>
-          <View style={styles.cardTop}>
-            <View style={styles.badges}>
-              <View style={[styles.badge, {backgroundColor: DIFFICULTY_COLOR[p.difficulty] + '22'}]}>
-                <Text style={[styles.badgeText, {color: DIFFICULTY_COLOR[p.difficulty]}]}>
-                  {p.difficulty}
-                </Text>
+      {filtered.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyText}>해당 토픽의 문제가 없어요</Text>
+        </View>
+      ) : (
+        filtered.map(p => (
+          <TouchableOpacity
+            key={p.id}
+            style={styles.problemCard}
+            onPress={() => navigation.navigate('ProblemSolve', {setId: p.setId})}>
+            <View style={styles.cardTop}>
+              <View style={styles.badges}>
+                <View style={[styles.badge, {backgroundColor: DIFFICULTY_COLOR[p.difficulty] + '22'}]}>
+                  <Text style={[styles.badgeText, {color: DIFFICULTY_COLOR[p.difficulty]}]}>
+                    {p.difficulty}
+                  </Text>
+                </View>
+                <View style={styles.typeBadge}>
+                  <Text style={styles.typeBadgeText}>{TYPE_LABEL[p.type]}</Text>
+                </View>
               </View>
-              <View style={styles.typeBadge}>
-                <Text style={styles.typeBadgeText}>{TYPE_LABEL[p.type]}</Text>
-              </View>
+              <Text style={styles.topicText}>{p.topic}</Text>
             </View>
-            <Text style={styles.topicText}>{p.topic}</Text>
-          </View>
-          <Text style={styles.problemTitle}>{p.title}</Text>
-          <Text style={styles.problemQuestion} numberOfLines={2}>{p.question}</Text>
-        </TouchableOpacity>
-      ))}
+            <Text style={styles.problemTitle}>{p.title}</Text>
+            <Text style={styles.problemQuestion} numberOfLines={2}>{p.question}</Text>
+          </TouchableOpacity>
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -80,11 +96,8 @@ function makeStyles(c: Colors, fs: number) {
     title: {fontSize: 20 * fs, fontWeight: '700', color: c.text, marginBottom: 16},
     filterScroll: {marginBottom: 16},
     filterBtn: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 20,
-      backgroundColor: c.filterInactive,
-      marginRight: 8,
+      paddingHorizontal: 14, paddingVertical: 8,
+      borderRadius: 20, backgroundColor: c.filterInactive, marginRight: 8,
     },
     filterActive: {backgroundColor: '#2979FF'},
     filterText: {fontSize: 13 * fs, color: c.subText},
@@ -96,13 +109,13 @@ function makeStyles(c: Colors, fs: number) {
     badgeText: {fontSize: 11 * fs, fontWeight: '600'},
     typeBadge: {
       backgroundColor: c.isDark ? '#1A1F3A' : '#EEF2FF',
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
+      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
     },
     typeBadgeText: {fontSize: 11 * fs, color: '#2979FF', fontWeight: '600'},
     topicText: {fontSize: 11 * fs, color: c.subText},
     problemTitle: {fontSize: 15 * fs, fontWeight: '700', color: c.text, marginBottom: 4},
     problemQuestion: {fontSize: 13 * fs, color: c.subText, lineHeight: 20 * fs},
+    emptyBox: {alignItems: 'center', paddingVertical: 40},
+    emptyText: {fontSize: 14 * fs, color: c.subText},
   });
 }
