@@ -21,6 +21,7 @@ const DIFFICULTY_COLOR: Record<string, string> = {
 };
 
 const DIFFICULTY_ICON: Record<string, string> = {
+  입문: 'beginner',
   초급: 'eco',
   중급: 'local-fire-department',
   고급: 'bolt',
