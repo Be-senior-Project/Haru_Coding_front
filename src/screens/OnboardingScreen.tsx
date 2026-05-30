@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -63,6 +64,10 @@ export default function OnboardingScreen() {
         correctCount: 0,
         categoryStats: [],
       };
+      await Promise.all([
+        AsyncStorage.setItem('codingLevel', codingLevel!),
+        AsyncStorage.setItem('cotePrepared', String(cotePrepared)),
+      ]);
       const result = await api.post<OnboardingResult>('/api/recommend/onboarding', body);
       navigation.replace('OnboardingResult', {
         difficulty: result.difficulty,

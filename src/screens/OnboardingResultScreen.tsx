@@ -15,16 +15,24 @@ import {useTheme, type Colors} from '../theme/ThemeContext';
 import type {RootStackParamList} from '../navigation/AppNavigator';
 
 const DIFFICULTY_COLOR: Record<string, string> = {
+  입문: '#2979FF',
   초급: '#4CAF50',
   중급: '#FF9800',
   고급: '#F44336',
 };
 
 const DIFFICULTY_ICON: Record<string, string> = {
-  입문: 'beginner',
+  입문: 'star-outline',
   초급: 'eco',
   중급: 'local-fire-department',
   고급: 'bolt',
+};
+
+const DIFFICULTY_BAR_WIDTH: Record<string, number> = {
+  입문: 25,
+  초급: 50,
+  중급: 75,
+  고급: 100,
 };
 
 export default function OnboardingResultScreen() {
@@ -71,8 +79,7 @@ export default function OnboardingResultScreen() {
               styles.difficultyBarFill,
               {
                 backgroundColor: diffColor,
-                width:
-                  difficulty === '초급' ? '33%' : difficulty === '중급' ? '66%' : '100%',
+                width: `${DIFFICULTY_BAR_WIDTH[difficulty] ?? 50}%`,
               },
             ]}
           />

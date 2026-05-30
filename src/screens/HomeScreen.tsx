@@ -9,8 +9,10 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme, type Colors} from '../theme/ThemeContext';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import {getPersonalizedRecommendation, type PersonalizedRecommendation} from '../api/recommendApi';
 
 const DIFFICULTY_COLOR: Record<string, string> = {
+  입문: '#2196F3',
   초급: '#4CAF50',
   중급: '#FF9800',
   고급: '#F44336',
@@ -28,6 +30,7 @@ export default function HomeScreen() {
   const [streak, setStreak] = useState(0);
   const [todaySolved, setTodaySolved] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [recommendation, setRecommendation] = useState<PersonalizedRecommendation | null>(null);
   const todaySet = getTodaySet();
   const insets = useSafeAreaInsets();
   const {colors, fontScale} = useTheme();
@@ -45,6 +48,12 @@ export default function HomeScreen() {
     if (saved) {setStreak(parseInt(saved, 10));}
     if (lastDate === today) {setTodaySolved(true);}
     setIsLoggedIn(!!token);
+    if (token) {
+      try {
+        const rec = await getPersonalizedRecommendation();
+        setRecommendation(rec);
+      } catch {}
+    }
   };
 
   const handleStartSet = () => {
@@ -121,6 +130,30 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* 오늘의 추천 */}
+      {recommendation !== null && !!recommendation.weakTopicIds?.length && (
+        <>
+          <Text style={styles.sectionTitle}>오늘의 추천</Text>
+          <View style={styles.recommendCard}>
+            <View style={styles.recommendReasonRow}>
+              <MaterialIcons name="lightbulb" size={16} color="#FFC107" />
+              <Text style={styles.recommendReason}>{recommendation.reason}</Text>
+            </View>
+            {(recommendation.weakTopicIds ?? []).map(topicId => (
+              <View key={topicId} style={styles.weakTopicBar}>
+                <View style={styles.weakTopicLeft}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#FF7043" />
+                  <Text style={styles.weakTopicName}>{TOPIC_NAME[topicId] ?? topicId}</Text>
+                </View>
+                <View style={styles.weakBadge}>
+                  <Text style={styles.weakBadgeText}>보완 필요</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
       {/* 주제 탐색 */}
       <Text style={styles.sectionTitle}>주제 탐색</Text>
       <View style={styles.topicGrid}>
@@ -167,6 +200,25 @@ const TYPE_LABEL: Record<string, string> = {
   fill_blank: '빈칸',
   word_match: '매칭',
   short_answer: '단답형',
+};
+
+const TOPIC_NAME: Record<string, string> = {
+  ALGORITHM: '알고리즘',
+  DATA_STRUCTURE: '자료구조',
+  LANGUAGE: '언어 문법',
+  MOCK_TEST: '모의 테스트',
+  STACK: '스택',
+  QUEUE: '큐',
+  TREE: '트리',
+  GRAPH: '그래프',
+  SORT: '정렬',
+  DP: '동적 프로그래밍',
+  HASH: '해시',
+  STRING: '문자열',
+  GREEDY: '탐욕 알고리즘',
+  BFS: '너비 우선 탐색',
+  DFS: '깊이 우선 탐색',
+  BINARY_SEARCH: '이진 탐색',
 };
 
 function makeStyles(c: Colors, fs: number) {
@@ -218,5 +270,25 @@ function makeStyles(c: Colors, fs: number) {
       borderRadius: 10, padding: 16, gap: 10,
     },
     loginBannerText: {flex: 1, fontSize: 13 * fs, color: c.subText},
+    recommendCard: {
+      backgroundColor: c.card, borderRadius: 14, padding: 16, marginBottom: 24,
+      borderLeftWidth: 3, borderLeftColor: '#FF7043',
+    },
+    recommendReasonRow: {
+      flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 14,
+    },
+    recommendReason: {flex: 1, fontSize: 13 * fs, color: c.subText, lineHeight: 19},
+    weakTopicBar: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      backgroundColor: c.isDark ? 'rgba(255,112,67,0.1)' : 'rgba(255,112,67,0.07)',
+      borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 6,
+    },
+    weakTopicLeft: {flexDirection: 'row', alignItems: 'center', gap: 8},
+    weakTopicName: {fontSize: 14 * fs, fontWeight: '600', color: c.text},
+    weakBadge: {
+      backgroundColor: 'rgba(255,112,67,0.18)', borderRadius: 6,
+      paddingHorizontal: 8, paddingVertical: 3,
+    },
+    weakBadgeText: {fontSize: 11 * fs, fontWeight: '700', color: '#FF7043'},
   });
 }
