@@ -3,8 +3,13 @@ import {api} from './apiFetch';
 import {userApi} from './userApi';
 import {statsApi} from './statsApi';
 
+interface ApiRecommendResponse {
+  topicIds: number[];
+  reason: string;
+}
+
 export interface PersonalizedRecommendation {
-  weakTopicIds: string[];
+  weakTopicIds: number[];
   reason: string;
 }
 
@@ -28,5 +33,9 @@ export async function getPersonalizedRecommendation(): Promise<PersonalizedRecom
     categoryStats: stats.categoryStats,
   };
 
-  return api.post<PersonalizedRecommendation>('/api/recommend/personalized', body);
+  const raw = await api.post<ApiRecommendResponse>('/api/recommend/personalized', body);
+  return {
+    weakTopicIds: raw.topicIds ?? [],
+    reason: raw.reason,
+  };
 }

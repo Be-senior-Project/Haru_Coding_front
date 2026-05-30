@@ -131,7 +131,7 @@ export default function HomeScreen() {
       )}
 
       {/* 오늘의 추천 */}
-      {recommendation !== null && !!recommendation.weakTopicIds?.length && (
+      {!!recommendation && !!recommendation.weakTopicIds?.length && (
         <>
           <Text style={styles.sectionTitle}>오늘의 추천</Text>
           <View style={styles.recommendCard}>
@@ -202,23 +202,11 @@ const TYPE_LABEL: Record<string, string> = {
   short_answer: '단답형',
 };
 
-const TOPIC_NAME: Record<string, string> = {
-  ALGORITHM: '알고리즘',
-  DATA_STRUCTURE: '자료구조',
-  LANGUAGE: '언어 문법',
-  MOCK_TEST: '모의 테스트',
-  STACK: '스택',
-  QUEUE: '큐',
-  TREE: '트리',
-  GRAPH: '그래프',
-  SORT: '정렬',
-  DP: '동적 프로그래밍',
-  HASH: '해시',
-  STRING: '문자열',
-  GREEDY: '탐욕 알고리즘',
-  BFS: '너비 우선 탐색',
-  DFS: '깊이 우선 탐색',
-  BINARY_SEARCH: '이진 탐색',
+const TOPIC_NAME: Record<number, string> = {
+  1: '알고리즘',
+  2: '자료구조',
+  3: '언어 문법',
+  4: '모의 테스트',
 };
 
 function makeStyles(c: Colors, fs: number) {
