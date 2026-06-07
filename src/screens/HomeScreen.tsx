@@ -150,11 +150,10 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* 맞춤 추천 (역량 기반) */}
-      {isLoggedIn && summary && (
+      {/* 맞춤 추천 (역량 기반) — 데이터 없어도 섹션은 항상 노출 */}
+      <Text style={styles.sectionTitle}>맞춤 추천</Text>
+      {summary ? (
         <>
-          <Text style={styles.sectionTitle}>맞춤 추천</Text>
-
           {/* 역량 요약 미니 카드 */}
           <View style={styles.competencyCard}>
             <View style={styles.competencyRow}>
@@ -212,6 +211,23 @@ export default function HomeScreen() {
             </View>
           )}
         </>
+      ) : (
+        <View style={styles.competencyEmpty}>
+          <MaterialIcons name="insights" size={28} color="#2979FF" />
+          <Text style={styles.competencyEmptyTitle}>문제를 풀면 역량을 평가해드려요</Text>
+          <Text style={styles.competencyEmptyDesc}>
+            {isLoggedIn
+              ? '문제를 풀수록 약점을 분석해 맞춤 문제를 추천해드려요.'
+              : '로그인하고 문제를 풀면 맞춤 추천이 시작돼요.'}
+          </Text>
+          {!isLoggedIn && (
+            <TouchableOpacity
+              style={styles.competencyEmptyBtn}
+              onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.competencyEmptyBtnText}>로그인하기</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
 
       {/* 주제 탐색 */}
@@ -338,6 +354,20 @@ function makeStyles(c: Colors, fs: number) {
     recReason: {flex: 1, fontSize: 12 * fs, color: c.subText, lineHeight: 18 * fs},
     recEmpty: {backgroundColor: c.card, borderRadius: 12, padding: 20, marginBottom: 12, alignItems: 'center'},
     recEmptyText: {fontSize: 13 * fs, color: c.subText},
+
+    // 역량 평가 빈 상태
+    competencyEmpty: {
+      backgroundColor: c.card, borderRadius: 14, padding: 24, marginBottom: 24,
+      alignItems: 'center', gap: 6,
+      borderWidth: 1, borderColor: c.border, borderStyle: 'dashed',
+    },
+    competencyEmptyTitle: {fontSize: 15 * fs, fontWeight: '700', color: c.text, marginTop: 4},
+    competencyEmptyDesc: {fontSize: 13 * fs, color: c.subText, textAlign: 'center', lineHeight: 19 * fs},
+    competencyEmptyBtn: {
+      marginTop: 10, backgroundColor: '#2979FF', borderRadius: 10,
+      paddingVertical: 10, paddingHorizontal: 28,
+    },
+    competencyEmptyBtnText: {color: '#FFF', fontWeight: '700', fontSize: 14 * fs},
 
     // 주제 탐색
     topicGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24, marginTop: 12},
