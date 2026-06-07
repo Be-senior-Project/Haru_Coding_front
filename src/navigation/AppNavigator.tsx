@@ -21,8 +21,8 @@ export type RootStackParamList = {
   Onboarding: undefined;
   OnboardingResult: {difficulty: string; reason: string; focusPoint: string};
   Main: undefined;
-  // 세트 ID + 문제 인덱스 전달 (단일 문제 → 세트 전체로 변경)
-  ProblemSolve: {setId: string; initialIndex?: number};
+  // problemId가 있으면 백엔드 실 문제 풀이, 없으면 setId 기반 목 데모
+  ProblemSolve: {setId?: string; problemId?: number; initialIndex?: number};
 };
 
 export type TabParamList = {

@@ -1,180 +1,162 @@
-export type ProblemType = 'multiple_choice' | 'fill_blank' | 'word_match' | 'short_answer';
+// 새 백엔드 problems 스키마 기준 목 데이터 (실 API 연동 전 데모용)
+import type {Problem} from '../types/problem';
 
-export interface Problem {
-  id: string;
-  type: ProblemType;
-  title: string;
-  difficulty: '초급' | '중급' | '고급';
-  topic: string;
-  question: string;
-  code?: string;
-  options?: string[];
-  blanks?: string[];
-  matchLeft?: string[];
-  matchRight?: string[];
-  answer: string | string[];
-  explanation: string;
-}
+export type {Problem} from '../types/problem';
+export type {ProblemType, IOExample} from '../types/problem';
 
-// 하루 1세트 = 문제 N개 묶음
+// 데모용 세트(묶음) — 백엔드의 set_id 문자열과는 별개로 화면 시연을 위한 그룹
 export interface ProblemSet {
   id: string;
   title: string;
-  targetDate: string;   // 'YYYY-MM-DD'
-  difficulty: '초급' | '중급' | '고급';
+  targetDate: string; // 'YYYY-MM-DD'
+  difficulty: number; // 0 | 1 | 2
   problems: Problem[];
 }
 
 // ─── 문제 데이터 ────────────────────────────────────────────
-
 const allProblems: Problem[] = [
-  // ── 세트 1: 2026-05-24 ──────────────────────────────────
+  // ── 세트 1 ─────────────────────────────────────────────
   {
-    id: 's1-1',
-    type: 'multiple_choice',
-    title: 'BFS 핵심 개념 이해',
-    difficulty: '초급',
-    topic: '알고리즘',
-    question: 'BFS(너비 우선 탐색)에 대한 설명으로 옳지 않은 것을 고르세요.',
-    options: [
-      '큐(Queue)를 사용해 구현한다',
-      '가중치 없는 그래프에서 최단 경로를 보장한다',
-      'DFS보다 항상 메모리를 적게 사용한다',
-      '시작 노드에서 가까운 노드부터 탐색한다',
+    id: 1,
+    setId: 'SET-BI-01',
+    type: 'IMPLEMENTATION',
+    category: 'Basic/Introductory',
+    subcategory: null,
+    difficulty: 0,
+    language: 'Python',
+    title: '짝수의 개수 세기',
+    description: '정수 배열 arr에서 짝수의 개수를 구해 반환하세요.',
+    constraints: [
+      '1 <= len(arr) <= 100',
+      'arr의 원소는 -1000 이상 1000 이하의 정수이다',
     ],
-    answer: 'DFS보다 항상 메모리를 적게 사용한다',
-    explanation: 'BFS는 같은 레벨의 모든 노드를 큐에 저장하므로, 넓은 그래프에서는 DFS보다 메모리를 더 많이 사용할 수 있습니다.',
+    ioExample: {input: 'arr = [1, 2, 3, 4, 6]', output: '3'},
+    codeSkeleton: 'def solution(arr):\n    cnt = 0\n    {{CORE}}\n    return cnt',
+    answer: '    for x in arr:\n        if x % 2 == 0:\n            cnt += 1',
+    explanation:
+      '배열의 각 원소를 순회하면서 2로 나누어 떨어지는지 확인하면 된다. 짝수일 때마다 카운트를 1씩 증가시키면 정답을 구할 수 있다. 시간 복잡도는 O(n).',
+    conceptExplanation:
+      '반복문과 조건문으로 배열을 훑으며 단순한 값을 계산하는 기본 구현 연습.',
   },
   {
-    id: 's1-2',
-    type: 'fill_blank',
-    title: '스택으로 괄호 검사',
-    difficulty: '중급',
-    topic: '자료구조',
-    question: '괄호 문자열이 올바른지 스택으로 검사하는 코드를 완성하세요.',
-    code: `def is_valid(s):\n    stack = []\n    for c in s:\n        if c == '(':\n            stack.___(c)      # 빈칸1\n        elif c == ')':\n            if not stack:\n                return False\n            stack.___()       # 빈칸2\n    return not ___            # 빈칸3`,
-    blanks: ['append', 'pop', 'stack'],
-    answer: ['append', 'pop', 'stack'],
-    explanation: '여는 괄호는 push, 닫는 괄호는 pop합니다. 마지막에 스택이 비어 있어야 모든 괄호가 짝이 맞습니다.',
+    id: 2,
+    setId: 'SET-BI-01',
+    type: 'DEBUGGING',
+    category: 'Basic/Introductory',
+    subcategory: null,
+    difficulty: 0,
+    language: 'Python',
+    title: '배열의 합 구하기',
+    description:
+      '정수 배열 arr의 모든 원소의 합을 반환하세요. 아래 코드에는 오류가 있습니다.',
+    constraints: [
+      '1 <= len(arr) <= 100',
+      'arr의 원소는 -1000 이상 1000 이하의 정수이다',
+    ],
+    ioExample: {input: 'arr = [2, 4, 6]', output: '12'},
+    codeSkeleton:
+      'def solution(arr):\n    s = 0\n    for i in range(len(arr) - 1):\n        s += arr[i]\n    return s',
+    answer:
+      'def solution(arr):\n    s = 0\n    for i in range(len(arr)):\n        s += arr[i]\n    return s',
+    explanation:
+      '마지막 원소를 누락한 반복 범위가 오류의 원인이다. range(len(arr))로 배열 전체를 순회해야 한다.',
+    conceptExplanation:
+      '반복 범위 off-by-one 오류를 찾아 고치는 디버깅 연습.',
   },
   {
-    id: 's1-3',
-    type: 'word_match',
-    title: 'IT 핵심 용어 매칭',
-    difficulty: '초급',
-    topic: '개념',
-    question: '핵심 용어와 정의를 올바르게 짝지어 보세요.',
-    matchLeft: ['메타버스', '디지털 트윈', '블록체인', '클라우드'],
-    matchRight: [
-      '가상과 현실이 상호작용하는 3차원 가상 세계',
-      '가상의 물리적 사물을 가상 세계 그대로 복제하는 기술',
-      '인터넷을 통해 IT 자원을 대여하여 사용하는 서비스',
-      '분산 컴퓨팅 기반의 데이터 위변조 방지 기술',
+    id: 3,
+    setId: 'SET-BI-01',
+    type: 'FILL_IN_THE_BLANK',
+    category: 'Basic/Introductory',
+    subcategory: null,
+    difficulty: 0,
+    language: 'Python',
+    title: '최댓값 찾기',
+    description:
+      '정수 배열 arr에서 가장 큰 값을 반환하세요. 배열은 비어 있지 않습니다.',
+    constraints: [
+      '1 <= len(arr) <= 100',
+      'arr의 원소는 -1000 이상 1000 이하의 정수이다',
     ],
-    answer: [
-      '가상과 현실이 상호작용하는 3차원 가상 세계',
-      '가상의 물리적 사물을 가상 세계 그대로 복제하는 기술',
-      '분산 컴퓨팅 기반의 데이터 위변조 방지 기술',
-      '인터넷을 통해 IT 자원을 대여하여 사용하는 서비스',
-    ],
-    explanation: '각 용어의 정의를 정확히 이해하는 것이 중요합니다.',
-  },
-  {
-    id: 's1-4',
-    type: 'short_answer',
-    title: 'OOP 캡슐화',
-    difficulty: '중급',
-    topic: '언어/문법',
-    question: '객체지향 프로그래밍(OOP)에서 데이터와 함수를 하나로 묶어 외부로부터의 직접적인 접근을 방지하는 기술은 무엇인가요?',
-    answer: '캡슐화',
-    explanation: '캡슐화(Encapsulation)는 OOP의 핵심 원칙 중 하나로, 데이터와 메서드를 클래스 내부에 숨기고 외부 접근을 제한합니다.',
+    ioExample: {input: 'arr = [3, 7, 2, 9, 5]', output: '9'},
+    codeSkeleton:
+      'def solution(arr):\n    mx = arr[0]\n    for x in arr:\n        if {{BLANK_1}}:\n            {{BLANK_2}}\n    return mx',
+    answer: ['x > mx', 'mx = x'],
+    explanation:
+      '초기 최댓값을 첫 원소로 두고, 배열을 순회하며 더 큰 값이 나오면 갱신한다. 시간 복잡도는 O(n).',
+    conceptExplanation: '순회하며 조건에 따라 값을 갱신하는 빈칸 채우기 연습.',
   },
 
-  // ── 세트 2: 2026-05-25 ──────────────────────────────────
+  // ── 세트 2 ─────────────────────────────────────────────
   {
-    id: 's2-1',
-    type: 'multiple_choice',
-    title: 'BFS 코드 오류 찾기',
-    difficulty: '중급',
-    topic: '알고리즘',
-    question: '아래 코드는 BFS처럼 보이지만 실제로는 DFS로 동작합니다. 원인을 고르세요.',
-    code: `from collections import deque\n\ndef traversal(graph, start):\n    visited = set([start])\n    queue = deque([start])\n\n    while queue:\n        node = queue.pop()      # ← 주목\n        print(node)\n\n        for neighbor in graph[node]:\n            if neighbor not in visited:\n                visited.add(neighbor)\n                queue.append(neighbor)`,
-    options: [
-      'queue.pop()이 LIFO 방식으로 꺼내므로 DFS가 된다',
-      'visited를 set으로 선언해 순서가 보장되지 않는다',
-      'queue.append() 대신 queue.appendleft()를 써야 한다',
-      '코드에 오류가 없다',
+    id: 4,
+    setId: 'SET-ADS-01',
+    type: 'IMPLEMENTATION',
+    category: 'Algorithm/Data Structure',
+    subcategory: 'DFS/BFS',
+    difficulty: 1,
+    language: 'Python',
+    title: '그래프의 연결 요소 개수',
+    description:
+      '노드 n개와 간선 목록 edges가 주어질 때, 연결 요소(connected component)의 개수를 반환하세요.',
+    constraints: [
+      '1 <= n <= 1000',
+      '0 <= len(edges) <= 2000',
     ],
-    answer: 'queue.pop()이 LIFO 방식으로 꺼내므로 DFS가 된다',
-    explanation: 'deque.pop()은 오른쪽(뒤)에서 꺼내는 LIFO 방식이라 스택처럼 동작합니다. BFS는 반드시 popleft()로 앞에서 꺼내야 합니다.',
+    ioExample: {input: 'n = 5\nedges = [[0,1],[1,2],[3,4]]', output: '2'},
+    codeSkeleton:
+      'def solution(n, edges):\n    graph = [[] for _ in range(n)]\n    for a, b in edges:\n        graph[a].append(b)\n        graph[b].append(a)\n    visited = [False] * n\n    count = 0\n    {{CORE}}\n    return count',
+    answer:
+      '    def dfs(node):\n        visited[node] = True\n        for nxt in graph[node]:\n            if not visited[nxt]:\n                dfs(nxt)\n    for i in range(n):\n        if not visited[i]:\n            dfs(i)\n            count += 1',
+    explanation:
+      '방문하지 않은 노드에서 DFS를 시작할 때마다 연결 요소가 하나씩 늘어난다. 모든 노드를 한 번씩 방문하므로 O(n + e).',
+    conceptExplanation:
+      'DFS/BFS로 그래프를 순회하며 연결 요소를 세는 대표 유형.',
   },
   {
-    id: 's2-2',
-    type: 'fill_blank',
-    title: '이진 탐색 구현',
-    difficulty: '중급',
-    topic: '알고리즘',
-    question: '정렬된 배열에서 target 값을 찾는 이진 탐색 코드를 완성하세요.',
-    code: `function binarySearch(arr, target) {\n  let left = 0;\n  let right = arr.___ - 1;\n\n  while (left <= right) {\n    const mid = Math.floor((left + right) / 2);\n    if (arr[mid] === target) return mid;\n    else if (arr[mid] < target) left = ___ + 1;\n    else right = mid - ___;\n  }\n  return -1;\n}`,
-    blanks: ['length', 'mid', '1'],
-    answer: ['length', 'mid', '1'],
-    explanation: '이진 탐색은 중간값과 target을 비교해 탐색 범위를 절반씩 줄입니다. 시간복잡도는 O(log n)입니다.',
-  },
-  {
-    id: 's2-3',
-    type: 'multiple_choice',
-    title: 'LRU 캐시 구현',
-    difficulty: '고급',
-    topic: '알고리즘',
-    question: '아래 LRU 캐시 구현에 대한 설명으로 올바른 것은?',
-    code: `class LRUCache {\n  constructor(capacity) {\n    this.capacity = capacity;\n    this.cache = new Map();\n  }\n  get(key) {\n    if (!this.cache.has(key)) return -1;\n    const value = this.cache.get(key);\n    this.cache.delete(key);\n    this.cache.set(key, value);\n    return value;\n  }\n  put(key, value) {\n    if (this.cache.has(key)) this.cache.delete(key);\n    else if (this.cache.size >= this.capacity) {\n      this.cache.delete(this.cache.keys().next().value);\n    }\n    this.cache.set(key, value);\n  }\n}`,
-    options: [
-      'Map은 삽입 순서를 보장하지 않아 오류가 있다',
-      '코드는 정상 동작하며 오류가 없다',
-      'get() 호출 시 순서가 갱신되지 않는다',
-      'capacity 비교 시 >= 대신 >를 써야 한다',
-    ],
-    answer: '코드는 정상 동작하며 오류가 없다',
-    explanation: 'JavaScript의 Map은 삽입 순서를 보장합니다. get()에서 delete→set으로 최근 사용 순서를 갱신하고, put()에서 keys().next().value로 가장 오래된 키를 꺼내 삭제합니다.',
-  },
-  {
-    id: 's2-4',
-    type: 'short_answer',
-    title: 'DP 개념',
-    difficulty: '초급',
-    topic: '알고리즘',
-    question: '동적 프로그래밍(DP)에서 이미 계산한 값을 저장해두고 재사용하는 기법을 무엇이라 하나요?',
-    answer: '메모이제이션',
-    explanation: '메모이제이션(Memoization)은 동일한 계산이 반복될 때 이전 결과를 캐시에 저장해 중복 계산을 방지하는 DP의 핵심 기법입니다.',
+    id: 5,
+    setId: 'SET-ADS-01',
+    type: 'FILL_IN_THE_BLANK',
+    category: 'Algorithm/Data Structure',
+    subcategory: 'Dynamic Programming',
+    difficulty: 1,
+    language: 'Python',
+    title: '피보나치 수 (DP)',
+    description: 'n번째 피보나치 수를 반환하세요. (F(0)=0, F(1)=1)',
+    constraints: ['0 <= n <= 30'],
+    ioExample: {input: 'n = 7', output: '13'},
+    codeSkeleton:
+      'def solution(n):\n    if n < 2:\n        return n\n    dp = [0] * (n + 1)\n    dp[1] = 1\n    for i in range(2, n + 1):\n        dp[i] = {{BLANK_1}}\n    return {{BLANK_2}}',
+    answer: ['dp[i - 1] + dp[i - 2]', 'dp[n]'],
+    explanation:
+      '이전 두 항의 합으로 현재 항을 채우는 전형적인 1차원 DP. 시간 복잡도 O(n).',
+    conceptExplanation: '점화식을 그대로 배열에 채우는 바텀업 DP 연습.',
   },
 ];
 
 // ─── 세트 정의 ────────────────────────────────────────────
-
 export const problemSets: ProblemSet[] = [
   {
     id: 'set-1',
     title: '오늘의 코딩 도전',
     targetDate: '2026-05-24',
-    difficulty: '초급',
-    problems: allProblems.filter(p => p.id.startsWith('s1-')),
+    difficulty: 0,
+    problems: allProblems.filter(p => p.setId === 'SET-BI-01'),
   },
   {
     id: 'set-2',
     title: '오늘의 코딩 도전',
     targetDate: '2026-05-25',
-    difficulty: '중급',
-    problems: allProblems.filter(p => p.id.startsWith('s2-')),
+    difficulty: 1,
+    problems: allProblems.filter(p => p.setId === 'SET-ADS-01'),
   },
 ];
 
 // ─── 유틸 함수 ────────────────────────────────────────────
-
 export const getTodaySet = (): ProblemSet | null => {
   const today = new Date().toISOString().split('T')[0];
   return problemSets.find(s => s.targetDate === today) ?? problemSets[0];
 };
 
-// 하위 호환 (ProblemSolveScreen에서 단일 문제 조회 시)
-export const getProblemById = (id: string): Problem | undefined =>
+export const getProblemById = (id: number): Problem | undefined =>
   allProblems.find(p => p.id === id);

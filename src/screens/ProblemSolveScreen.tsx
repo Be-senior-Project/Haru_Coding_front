@@ -1,26 +1,39 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  TextInput, ScrollView, Alert,
+  TextInput, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import type {RouteProp} from '@react-navigation/native';
 import type {RootStackParamList} from '../navigation/AppNavigator';
-import {problemSets, type Problem} from '../data/mockProblems';
+import {problemSets} from '../data/mockProblems';
+import type {Problem} from '../types/problem';
+import {TYPE_LABEL, toCodeLang} from '../types/problem';
+import {problemApi} from '../api/problemApi';
 import {useTheme, type Colors} from '../theme/ThemeContext';
 import CodeBlock from '../components/CodeBlock';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 type RouteProps = RouteProp<RootStackParamList, 'ProblemSolve'>;
 
-const TYPE_LABEL: Record<string, string> = {
-  multiple_choice: '객관식 퀴즈',
-  fill_blank: '코드 빈칸 채우기',
-  word_match: '단어 매칭',
-  short_answer: '단답형/서술형',
-};
+function normalizeCode(s: string): string {
+  return s.replace(/\r/g, '').split('\n').map(l => l.replace(/\s+$/, '')).join('\n').trim();
+}
+
+function countBlanks(p: Problem): number {
+  const m = (p.codeSkeleton ?? '').match(/\{\{BLANK_\d+\}\}/g);
+  if (m) return m.length;
+  return Array.isArray(p.answer) ? p.answer.length : 0;
+}
+
+function displayCode(p: Problem): string {
+  const code = p.codeSkeleton ?? '';
+  if (p.type === 'FILL_IN_THE_BLANK') return code.replace(/\{\{BLANK_\d+\}\}/g, '___');
+  if (p.type === 'IMPLEMENTATION') return code.replace(/\{\{CORE\}\}/g, '# (여기에 코드를 작성하세요)');
+  return code;
+}
 
 export default function ProblemSolveScreen() {
   const navigation = useNavigation();
@@ -29,60 +42,133 @@ export default function ProblemSolveScreen() {
   const {colors, fontScale} = useTheme();
   const styles = useMemo(() => makeStyles(colors, fontScale), [colors, fontScale]);
 
-  // 세트 조회
-  const set = problemSets.find(s => s.id === route.params.setId) ?? problemSets[0];
-  const problems = set.problems;
+  const isReal = route.params.problemId != null;
 
-  // 현재 문제 인덱스
+  // 목 데모용 세트
+  const mockSet = problemSets.find(s => s.id === route.params.setId) ?? problemSets[0];
+
+  const [problems, setProblems] = useState<Problem[]>(isReal ? [] : mockSet.problems);
+  const [loading, setLoading] = useState(isReal);
+  const [loadError, setLoadError] = useState(false);
+
   const [currentIndex, setCurrentIndex] = useState(route.params.initialIndex ?? 0);
-  const problem = problems[currentIndex];
 
   // 답안 상태
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [fillAnswers, setFillAnswers] = useState<string[]>([]);
-  const [matchSelections, setMatchSelections] = useState<Record<number, string>>({});
-  const [shortAnswer, setShortAnswer] = useState('');
+  const [codeAnswer, setCodeAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [isCorrect, setIsCorrect] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [startedAt, setStartedAt] = useState(Date.now());
 
-  // 세트 전체 결과 기록
-  const [results, setResults] = useState<{id: string; correct: boolean}[]>([]);
+  // 채점 결과 (목=로컬, 실=백엔드 응답)
+  const [isCorrect, setIsCorrect] = useState(false);
+  const [resultAnswer, setResultAnswer] = useState<string | string[] | null>(null);
+  const [resultExplain, setResultExplain] = useState('');
+  const [results, setResults] = useState<{id: number; correct: boolean}[]>([]);
+
+  const problem: Problem | undefined = problems[currentIndex];
+
+  // 실 문제 로드
+  useEffect(() => {
+    if (!isReal) return;
+    let alive = true;
+    setLoading(true);
+    problemApi
+      .get(route.params.problemId as number)
+      .then(p => {
+        if (alive) setProblems([p]);
+      })
+      .catch(() => {
+        if (alive) setLoadError(true);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [isReal, route.params.problemId]);
 
   // 문제 전환 시 상태 초기화
-  const resetState = () => {
-    setSelectedOption(null);
-    setFillAnswers(problems[currentIndex + 1]?.blanks?.map(() => '') ?? []);
-    setMatchSelections({});
-    setShortAnswer('');
+  useEffect(() => {
+    if (!problem) return;
+    if (problem.type === 'FILL_IN_THE_BLANK') {
+      setFillAnswers(Array(countBlanks(problem)).fill(''));
+      setCodeAnswer('');
+    } else {
+      setFillAnswers([]);
+      setCodeAnswer(problem.type === 'DEBUGGING' ? (problem.codeSkeleton ?? '') : '');
+    }
     setSubmitted(false);
     setIsCorrect(false);
-  };
+    setResultAnswer(null);
+    setResultExplain('');
+    setStartedAt(Date.now());
+  }, [currentIndex, problem]);
 
-  const checkAnswer = (): boolean => {
-    switch (problem.type) {
-      case 'multiple_choice':
-        return selectedOption === problem.answer;
-      case 'fill_blank':
-        return fillAnswers.every(
-          (a, i) => a.trim().toLowerCase() === (problem.answer as string[])[i].toLowerCase(),
-        );
-      case 'word_match':
-        return (problem.matchLeft ?? []).every(
-          (_, i) => matchSelections[i] === (problem.answer as string[])[i],
-        );
-      case 'short_answer':
-        return shortAnswer.trim() === (problem.answer as string);
-      default:
-        return false;
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#2979FF" />
+      </View>
+    );
+  }
+  if (loadError || !problem) {
+    return (
+      <View style={[styles.container, styles.center, {padding: 32}]}>
+        <Text style={styles.errorText}>문제를 불러오지 못했어요.</Text>
+        <TouchableOpacity style={styles.submitBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.submitBtnText}>돌아가기</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const buildAnswerPayload = (): unknown =>
+    problem.type === 'FILL_IN_THE_BLANK' ? fillAnswers : codeAnswer;
+
+  const localCheck = (): boolean => {
+    if (problem.type === 'FILL_IN_THE_BLANK') {
+      const ans = (problem.answer as string[]) ?? [];
+      return ans.length > 0 &&
+        ans.every((a, i) => (fillAnswers[i] ?? '').trim().toLowerCase() === a.trim().toLowerCase());
     }
+    return normalizeCode(codeAnswer) === normalizeCode(problem.answer as string);
   };
 
   const handleSubmit = async () => {
-    const correct = checkAnswer();
+    const timeSpentSec = Math.round((Date.now() - startedAt) / 1000);
+
+    if (isReal) {
+      // 백엔드 채점 + 기록
+      setSubmitting(true);
+      try {
+        const res = await problemApi.attempt(problem.id, buildAnswerPayload(), timeSpentSec);
+        setIsCorrect(res.correct);
+        setResultAnswer(res.correctAnswer);
+        setResultExplain(res.explanation);
+        setResults(prev => [...prev, {id: problem.id, correct: res.correct}]);
+        const today = new Date().toISOString().split('T')[0];
+        await AsyncStorage.multiSet([
+          ['streak', String(res.currentStreak)],
+          ['lastSolvedDate', today],
+        ]);
+        setSubmitted(true);
+      } catch (e: any) {
+        Alert.alert('제출 실패', e.message || '로그인이 필요하거나 네트워크 오류예요.');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // 목 데모: 로컬 채점
+    const correct = localCheck();
     setIsCorrect(correct);
+    setResultAnswer(problem.answer);
+    setResultExplain(problem.explanation);
     setSubmitted(true);
     setResults(prev => [...prev, {id: problem.id, correct}]);
-
     if (correct) {
       const today = new Date().toISOString().split('T')[0];
       const lastDate = await AsyncStorage.getItem('lastSolvedDate');
@@ -100,20 +186,19 @@ export default function ProblemSolveScreen() {
   const handleNext = () => {
     if (currentIndex < problems.length - 1) {
       setCurrentIndex(prev => prev + 1);
-      resetState();
     } else {
-      // 세트 완료
-      const correctCount = results.filter(r => r.correct).length + (isCorrect ? 1 : 0);
+      const correctCount = results.filter(r => r.correct).length;
       Alert.alert(
-        '🎉 세트 완료!',
-        `${problems.length}문제 중 ${correctCount}개 정답\n정답률 ${Math.round(correctCount / problems.length * 100)}%`,
-        [{text: '홈으로', onPress: () => navigation.goBack()}],
+        '🎉 완료!',
+        `${problems.length}문제 중 ${correctCount}개 정답\n정답률 ${Math.round((correctCount / problems.length) * 100)}%`,
+        [{text: '확인', onPress: () => navigation.goBack()}],
       );
     }
   };
 
   const isLastProblem = currentIndex === problems.length - 1;
   const progress = (currentIndex + (submitted ? 1 : 0)) / problems.length;
+  const correctAnswersForHint = Array.isArray(resultAnswer) ? resultAnswer : [];
 
   return (
     <ScrollView
@@ -131,67 +216,85 @@ export default function ProblemSolveScreen() {
         <Text style={styles.progressText}>{currentIndex + 1} / {problems.length}</Text>
       </View>
 
-      {/* 문제 유형 뱃지 */}
       <View style={styles.typeBadge}>
         <Text style={styles.typeBadgeText}>{TYPE_LABEL[problem.type]}</Text>
       </View>
 
-      {/* 문제 */}
-      <Text style={styles.question}>{problem.question}</Text>
-      {problem.code && <CodeBlock code={problem.code} />}
+      <Text style={styles.title}>{problem.title}</Text>
+      <Text style={styles.question}>{problem.description}</Text>
 
-      {/* 유형별 답안 입력 */}
-      {problem.type === 'multiple_choice' && (
-        <MultipleChoice
-          options={problem.options ?? []}
-          selected={selectedOption}
-          submitted={submitted}
-          correctAnswer={problem.answer as string}
-          onSelect={setSelectedOption}
-        />
+      {!!problem.constraints?.length && (
+        <View style={styles.metaBox}>
+          <Text style={styles.metaLabel}>제약 조건</Text>
+          {problem.constraints.map((c, i) => (
+            <Text key={i} style={styles.metaItem}>• {c}</Text>
+          ))}
+        </View>
       )}
-      {problem.type === 'fill_blank' && (
+
+      {!!problem.ioExample && (
+        <View style={styles.metaBox}>
+          <Text style={styles.metaLabel}>입출력 예시</Text>
+          <Text style={styles.ioLabel}>입력</Text>
+          <Text style={styles.ioValue}>{problem.ioExample.input}</Text>
+          <Text style={styles.ioLabel}>출력</Text>
+          <Text style={styles.ioValue}>{problem.ioExample.output}</Text>
+        </View>
+      )}
+
+      {!!problem.codeSkeleton && (
+        <CodeBlock code={displayCode(problem)} language={toCodeLang(problem.language)} />
+      )}
+
+      {problem.type === 'FILL_IN_THE_BLANK' ? (
         <FillBlank
-          blanks={problem.blanks ?? []}
-          values={fillAnswers.length ? fillAnswers : (problem.blanks ?? []).map(() => '')}
+          count={countBlanks(problem)}
+          values={fillAnswers}
           submitted={submitted}
-          correctAnswers={problem.answer as string[]}
-          onChange={(i, v) => {
-            const next = [...(fillAnswers.length ? fillAnswers : (problem.blanks ?? []).map(() => ''))];
-            next[i] = v;
-            setFillAnswers(next);
-          }}
-        />
-      )}
-      {problem.type === 'word_match' && (
-        <WordMatch
-          left={problem.matchLeft ?? []}
-          right={problem.matchRight ?? []}
-          selections={matchSelections}
-          submitted={submitted}
-          correctAnswers={problem.answer as string[]}
-          onSelect={(leftIdx, rightVal) =>
-            setMatchSelections(prev => ({...prev, [leftIdx]: rightVal}))
+          correctAnswers={correctAnswersForHint}
+          onChange={(i, v) =>
+            setFillAnswers(prev => {
+              const next = [...prev];
+              next[i] = v;
+              return next;
+            })
           }
         />
-      )}
-      {problem.type === 'short_answer' && (
-        <ShortAnswer value={shortAnswer} submitted={submitted} onChange={setShortAnswer} />
+      ) : (
+        <CodeAnswer
+          value={codeAnswer}
+          submitted={submitted}
+          placeholder={problem.type === 'DEBUGGING' ? '코드를 수정하세요' : '코드를 작성하세요'}
+          onChange={setCodeAnswer}
+        />
       )}
 
-      {/* 제출 / 결과 / 다음 */}
       {!submitted ? (
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-          <Text style={styles.submitBtnText}>정답 확인하기</Text>
+        <TouchableOpacity
+          style={[styles.submitBtn, submitting && styles.btnDisabled]}
+          onPress={handleSubmit}
+          disabled={submitting}>
+          {submitting ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.submitBtnText}>정답 확인하기</Text>
+          )}
         </TouchableOpacity>
       ) : (
         <View style={[styles.resultCard, isCorrect ? styles.correctCard : styles.wrongCard]}>
           <Text style={styles.resultTitle}>{isCorrect ? '🎉 정답!' : '😢 오답'}</Text>
-          <Text style={styles.resultExplain}>{problem.explanation}</Text>
+          {!isCorrect && resultAnswer != null && (
+            <>
+              <Text style={styles.answerLabel}>모범 답안</Text>
+              <CodeBlock
+                code={Array.isArray(resultAnswer) ? resultAnswer.join('\n') : resultAnswer}
+                language={toCodeLang(problem.language)}
+              />
+            </>
+          )}
+          {!!resultExplain && <Text style={styles.resultExplain}>{resultExplain}</Text>}
           <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
-            <Text style={styles.nextBtnText}>
-              {isLastProblem ? '결과 보기' : '다음 문제 →'}
-            </Text>
+            <Text style={styles.nextBtnText}>{isLastProblem ? '결과 보기' : '다음 문제 →'}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -201,43 +304,18 @@ export default function ProblemSolveScreen() {
 
 // ─── 하위 컴포넌트 ────────────────────────────────────────────
 
-function MultipleChoice({options, selected, submitted, correctAnswer, onSelect}: {
-  options: string[]; selected: string | null; submitted: boolean;
-  correctAnswer: string; onSelect: (v: string) => void;
-}) {
-  const {colors, fontScale} = useTheme();
-  const styles = useMemo(() => makeStyles(colors, fontScale), [colors, fontScale]);
-  return (
-    <View style={styles.optionsContainer}>
-      {options.map((opt, i) => {
-        let bg = colors.card;
-        if (submitted) {
-          if (opt === correctAnswer) {bg = '#E8F5E9';}
-          else if (opt === selected) {bg = '#FFEBEE';}
-        } else if (opt === selected) {bg = '#E3F2FD';}
-        return (
-          <TouchableOpacity
-            key={i} style={[styles.optionItem, {backgroundColor: bg}]}
-            onPress={() => !submitted && onSelect(opt)} disabled={submitted}>
-            <Text style={styles.optionNum}>{i + 1}</Text>
-            <Text style={styles.optionText}>{opt}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-function FillBlank({blanks, values, submitted, correctAnswers, onChange}: {
-  blanks: string[]; values: string[]; submitted: boolean;
+function FillBlank({count, values, submitted, correctAnswers, onChange}: {
+  count: number; values: string[]; submitted: boolean;
   correctAnswers: string[]; onChange: (i: number, v: string) => void;
 }) {
   const {colors, fontScale} = useTheme();
   const styles = useMemo(() => makeStyles(colors, fontScale), [colors, fontScale]);
   return (
     <View style={styles.fillContainer}>
-      {blanks.map((_, i) => {
-        const correct = submitted && values[i]?.trim().toLowerCase() === correctAnswers[i]?.toLowerCase();
+      {Array.from({length: count}).map((_, i) => {
+        const hasAnswer = correctAnswers.length > i;
+        const correct = submitted && hasAnswer &&
+          values[i]?.trim().toLowerCase() === correctAnswers[i]?.toLowerCase();
         const wrong = submitted && !correct;
         return (
           <View key={i} style={styles.fillRow}>
@@ -247,10 +325,14 @@ function FillBlank({blanks, values, submitted, correctAnswers, onChange}: {
               value={values[i] ?? ''}
               onChangeText={v => onChange(i, v)}
               editable={!submitted}
-              placeholder={`빈칸 ${i + 1}를 입력하세요`}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder={`빈칸 ${i + 1}을 입력하세요`}
               placeholderTextColor={colors.subText}
             />
-            {submitted && wrong && <Text style={styles.correctHint}>정답: {correctAnswers[i]}</Text>}
+            {submitted && wrong && hasAnswer && (
+              <Text style={styles.correctHint}>정답: {correctAnswers[i]}</Text>
+            )}
           </View>
         );
       })}
@@ -258,69 +340,25 @@ function FillBlank({blanks, values, submitted, correctAnswers, onChange}: {
   );
 }
 
-function WordMatch({left, right, selections, submitted, correctAnswers, onSelect}: {
-  left: string[]; right: string[]; selections: Record<number, string>;
-  submitted: boolean; correctAnswers: string[];
-  onSelect: (leftIdx: number, rightVal: string) => void;
-}) {
-  const {colors, fontScale} = useTheme();
-  const styles = useMemo(() => makeStyles(colors, fontScale), [colors, fontScale]);
-  const [activeLeft, setActiveLeft] = useState<number | null>(null);
-  const [shuffledRight] = useState([...right].sort(() => Math.random() - 0.5));
-
-  return (
-    <View>
-      <Text style={styles.matchHint}>왼쪽 단어를 선택 후 오른쪽 설명을 선택하세요</Text>
-      <View style={styles.matchContainer}>
-        <View style={styles.matchCol}>
-          {left.map((word, i) => {
-            const isActive = activeLeft === i;
-            const isCorrect = submitted && selections[i] === correctAnswers[i];
-            const isWrong = submitted && !isCorrect;
-            return (
-              <TouchableOpacity
-                key={i}
-                style={[styles.matchItem, isActive && styles.matchActive,
-                  selections[i] !== undefined && styles.matchSelected,
-                  submitted && isCorrect && styles.matchCorrect,
-                  submitted && isWrong && styles.matchWrong]}
-                onPress={() => !submitted && setActiveLeft(i)}>
-                <Text style={styles.matchText}>{word}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        <View style={styles.matchCol}>
-          {shuffledRight.map((desc, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[styles.matchItem, Object.values(selections).includes(desc) && styles.matchSelected]}
-              onPress={() => {
-                if (activeLeft !== null && !submitted) {
-                  onSelect(activeLeft, desc);
-                  setActiveLeft(null);
-                }
-              }}>
-              <Text style={styles.matchText} numberOfLines={2}>{desc}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-      <Text style={styles.matchRemain}>남은 짝: {left.length - Object.keys(selections).length}개</Text>
-    </View>
-  );
-}
-
-function ShortAnswer({value, submitted, onChange}: {
-  value: string; submitted: boolean; onChange: (v: string) => void;
+function CodeAnswer({value, submitted, placeholder, onChange}: {
+  value: string; submitted: boolean; placeholder: string; onChange: (v: string) => void;
 }) {
   const {colors, fontScale} = useTheme();
   const styles = useMemo(() => makeStyles(colors, fontScale), [colors, fontScale]);
   return (
     <TextInput
-      style={[styles.shortInput, submitted && styles.inputDisabled]}
-      value={value} onChangeText={onChange} editable={!submitted}
-      placeholder="답을 입력하세요" placeholderTextColor={colors.subText} multiline
+      style={[styles.codeInput, submitted && styles.inputDisabled]}
+      value={value}
+      onChangeText={onChange}
+      editable={!submitted}
+      placeholder={placeholder}
+      placeholderTextColor={colors.subText}
+      multiline
+      autoCapitalize="none"
+      autoCorrect={false}
+      autoComplete="off"
+      spellCheck={false}
+      textAlignVertical="top"
     />
   );
 }
@@ -328,6 +366,7 @@ function ShortAnswer({value, submitted, onChange}: {
 function makeStyles(c: Colors, fs: number) {
   return StyleSheet.create({
     container: {flex: 1, backgroundColor: c.bg},
+    center: {justifyContent: 'center', alignItems: 'center'},
     content: {padding: 20, paddingBottom: 60},
     topBar: {flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 12},
     progressBarWrap: {flex: 1, height: 8, backgroundColor: c.border, borderRadius: 4, overflow: 'hidden'},
@@ -338,57 +377,50 @@ function makeStyles(c: Colors, fs: number) {
       borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 10,
     },
     typeBadgeText: {fontSize: 12 * fs, color: '#2979FF', fontWeight: '600'},
-    question: {fontSize: 17 * fs, fontWeight: '600', color: c.text, lineHeight: 26 * fs, marginBottom: 16},
-    optionsContainer: {gap: 10, marginBottom: 24},
-    optionItem: {
-      flexDirection: 'row', alignItems: 'center', borderRadius: 10,
-      borderWidth: 1, borderColor: c.border, padding: 14, gap: 12,
+    title: {fontSize: 18 * fs, fontWeight: '700', color: c.text, marginBottom: 8},
+    question: {fontSize: 15 * fs, color: c.text, lineHeight: 23 * fs, marginBottom: 16},
+    metaBox: {
+      backgroundColor: c.card, borderRadius: 10, padding: 14, marginBottom: 16,
+      borderWidth: 1, borderColor: c.border,
     },
-    optionNum: {fontSize: 14 * fs, fontWeight: '700', color: c.subText, width: 20},
-    optionText: {fontSize: 14 * fs, color: c.text, flex: 1},
+    metaLabel: {fontSize: 12 * fs, fontWeight: '700', color: c.subText, marginBottom: 6},
+    metaItem: {fontSize: 13 * fs, color: c.text, lineHeight: 20 * fs},
+    ioLabel: {fontSize: 11 * fs, color: c.subText, marginTop: 4},
+    ioValue: {fontSize: 13 * fs, color: c.text, fontFamily: 'monospace', marginTop: 2},
     fillContainer: {gap: 14, marginBottom: 24},
     fillRow: {gap: 6},
     fillLabel: {fontSize: 13 * fs, color: c.subText},
     fillInput: {
       borderWidth: 1, borderColor: c.border, borderRadius: 10,
       padding: 14, fontSize: 14 * fs, backgroundColor: c.card, color: c.text,
+      fontFamily: 'monospace',
+    },
+    codeInput: {
+      borderWidth: 1, borderColor: c.border, borderRadius: 10,
+      padding: 14, fontSize: 13 * fs, backgroundColor: c.card, color: c.text,
+      fontFamily: 'monospace', minHeight: 140, marginBottom: 24,
     },
     inputCorrect: {borderColor: '#4CAF50', backgroundColor: '#E8F5E9'},
     inputWrong: {borderColor: '#F44336', backgroundColor: '#FFEBEE'},
     inputDisabled: {backgroundColor: c.isDark ? '#1A1A2A' : '#F5F5F5'},
     correctHint: {fontSize: 12, color: '#F44336'},
-    matchHint: {fontSize: 13 * fs, color: c.subText, marginBottom: 12},
-    matchContainer: {flexDirection: 'row', gap: 8, marginBottom: 12},
-    matchCol: {flex: 1, gap: 8},
-    matchItem: {
-      backgroundColor: c.card, borderWidth: 1, borderColor: c.border,
-      borderRadius: 8, padding: 10, minHeight: 56, justifyContent: 'center',
-    },
-    matchActive: {borderColor: '#2979FF', backgroundColor: '#E3F2FD'},
-    matchSelected: {borderColor: '#90CAF9', backgroundColor: c.isDark ? '#0D1F3A' : '#F0F7FF'},
-    matchCorrect: {borderColor: '#4CAF50', backgroundColor: '#E8F5E9'},
-    matchWrong: {borderColor: '#F44336', backgroundColor: '#FFEBEE'},
-    matchText: {fontSize: 12 * fs, color: c.text},
-    matchRemain: {fontSize: 12 * fs, color: c.subText, textAlign: 'right'},
-    shortInput: {
-      borderWidth: 1, borderColor: c.border, borderRadius: 10,
-      padding: 14, fontSize: 14 * fs, backgroundColor: c.card,
-      color: c.text, minHeight: 80, marginBottom: 24,
-    },
     submitBtn: {
       backgroundColor: '#2979FF', borderRadius: 12,
       paddingVertical: 16, alignItems: 'center', marginTop: 8,
     },
+    btnDisabled: {opacity: 0.6},
     submitBtnText: {color: '#FFF', fontSize: 16, fontWeight: '700'},
     resultCard: {borderRadius: 14, padding: 20, marginTop: 8},
     correctCard: {backgroundColor: '#E8F5E9'},
     wrongCard: {backgroundColor: '#FFEBEE'},
     resultTitle: {fontSize: 20, fontWeight: '700', marginBottom: 10},
+    answerLabel: {fontSize: 12, fontWeight: '700', color: '#333', marginBottom: 6},
     resultExplain: {fontSize: 14, color: '#333', lineHeight: 22, marginBottom: 16},
     nextBtn: {
       backgroundColor: '#2979FF', borderRadius: 10,
       paddingVertical: 14, alignItems: 'center',
     },
     nextBtnText: {color: '#FFF', fontWeight: '700', fontSize: 15},
+    errorText: {fontSize: 15, color: c.subText, marginBottom: 16, textAlign: 'center'},
   });
 }

@@ -1,42 +1,69 @@
-import React, {useMemo, useState} from 'react';
-import {View, Text, StyleSheet, ScrollView, TouchableOpacity} from 'react-native';
+import React, {useEffect, useMemo, useState} from 'react';
+import {View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../navigation/AppNavigator';
-import {problemSets, type Problem} from '../data/mockProblems';
+import {problemSets} from '../data/mockProblems';
+import {problemApi} from '../api/problemApi';
+import type {Problem} from '../types/problem';
+import {TYPE_LABEL, difficultyLabel, difficultyColor} from '../types/problem';
 import {useTheme, type Colors} from '../theme/ThemeContext';
 
-const DIFFICULTY_COLOR: Record<string, string> = {
-  초급: '#4CAF50',
-  중급: '#FF9800',
-  고급: '#F44336',
-};
+// 화면에서 다루는 통합 카드 모델 (실/목 공통)
+type Card = Problem & {demoSetId?: string};
 
-const TYPE_LABEL: Record<string, string> = {
-  multiple_choice: '객관식',
-  fill_blank: '빈칸',
-  word_match: '매칭',
-  short_answer: '단답형',
-};
-
-// 모든 세트에서 문제 flat하게 추출 + 세트 ID 매핑
-const allProblemsWithSetId = problemSets.flatMap(set =>
-  set.problems.map(p => ({...p, setId: set.id})),
+// 목 폴백: 모든 세트 문제 flat + 데모 세트 ID
+const mockCards: Card[] = problemSets.flatMap(set =>
+  set.problems.map(p => ({...p, demoSetId: set.id})),
 );
 
 export default function ProblemBankScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [selectedTopic, setSelectedTopic] = useState('전체');
-  const topics = ['전체', '알고리즘', '자료구조', '개념', '언어/문법'];
   const insets = useSafeAreaInsets();
   const {colors, fontScale} = useTheme();
   const styles = useMemo(() => makeStyles(colors, fontScale), [colors, fontScale]);
 
+  const [cards, setCards] = useState<Card[]>(mockCards);
+  const [isReal, setIsReal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('전체');
+
+  useEffect(() => {
+    let alive = true;
+    problemApi
+      .list({limit: 100})
+      .then(list => {
+        if (alive && list.length > 0) {
+          setCards(list);
+          setIsReal(true);
+        }
+      })
+      .catch(() => {
+        /* 실패 시 목 데이터 유지 */
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const categories = useMemo(
+    () => ['전체', ...Array.from(new Set(cards.map(c => c.category)))],
+    [cards],
+  );
+
   const filtered =
-    selectedTopic === '전체'
-      ? allProblemsWithSetId
-      : allProblemsWithSetId.filter(p => p.topic === selectedTopic);
+    selectedCategory === '전체'
+      ? cards
+      : cards.filter(c => c.category === selectedCategory);
+
+  const openProblem = (c: Card) => {
+    if (isReal) navigation.navigate('ProblemSolve', {problemId: c.id});
+    else navigation.navigate('ProblemSolve', {setId: c.demoSetId});
+  };
 
   return (
     <ScrollView
@@ -45,43 +72,42 @@ export default function ProblemBankScreen() {
       <Text style={styles.title}>문제 은행</Text>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-        {topics.map(t => (
+        {categories.map(t => (
           <TouchableOpacity
             key={t}
-            style={[styles.filterBtn, selectedTopic === t && styles.filterActive]}
-            onPress={() => setSelectedTopic(t)}>
-            <Text style={[styles.filterText, selectedTopic === t && styles.filterTextActive]}>
+            style={[styles.filterBtn, selectedCategory === t && styles.filterActive]}
+            onPress={() => setSelectedCategory(t)}>
+            <Text style={[styles.filterText, selectedCategory === t && styles.filterTextActive]}>
               {t}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <ActivityIndicator color="#2979FF" style={{marginTop: 32}} />
+      ) : filtered.length === 0 ? (
         <View style={styles.emptyBox}>
-          <Text style={styles.emptyText}>해당 토픽의 문제가 없어요</Text>
+          <Text style={styles.emptyText}>해당 카테고리의 문제가 없어요</Text>
         </View>
       ) : (
-        filtered.map(p => (
-          <TouchableOpacity
-            key={p.id}
-            style={styles.problemCard}
-            onPress={() => navigation.navigate('ProblemSolve', {setId: p.setId})}>
+        filtered.map(c => (
+          <TouchableOpacity key={c.id} style={styles.problemCard} onPress={() => openProblem(c)}>
             <View style={styles.cardTop}>
               <View style={styles.badges}>
-                <View style={[styles.badge, {backgroundColor: DIFFICULTY_COLOR[p.difficulty] + '22'}]}>
-                  <Text style={[styles.badgeText, {color: DIFFICULTY_COLOR[p.difficulty]}]}>
-                    {p.difficulty}
+                <View style={[styles.badge, {backgroundColor: difficultyColor(c.difficulty) + '22'}]}>
+                  <Text style={[styles.badgeText, {color: difficultyColor(c.difficulty)}]}>
+                    {difficultyLabel(c.difficulty)}
                   </Text>
                 </View>
                 <View style={styles.typeBadge}>
-                  <Text style={styles.typeBadgeText}>{TYPE_LABEL[p.type]}</Text>
+                  <Text style={styles.typeBadgeText}>{TYPE_LABEL[c.type]}</Text>
                 </View>
               </View>
-              <Text style={styles.topicText}>{p.topic}</Text>
+              <Text style={styles.topicText}>{c.subcategory ?? c.category}</Text>
             </View>
-            <Text style={styles.problemTitle}>{p.title}</Text>
-            <Text style={styles.problemQuestion} numberOfLines={2}>{p.question}</Text>
+            <Text style={styles.problemTitle}>{c.title}</Text>
+            <Text style={styles.problemQuestion} numberOfLines={2}>{c.description}</Text>
           </TouchableOpacity>
         ))
       )}
