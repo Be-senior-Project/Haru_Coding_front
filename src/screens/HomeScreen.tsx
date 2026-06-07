@@ -10,7 +10,27 @@ import {useTheme, type Colors} from '../theme/ThemeContext';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {recommendationApi, type RecommendationResponse} from '../api/recommendationApi';
+import {statsApi, type RecentRecord} from '../api/statsApi';
 import {TYPE_LABEL, difficultyLabel, difficultyColor} from '../types/problem';
+
+// 데모용 가짜 최근 활동 (실 기록이 없을 때 표시)
+const MOCK_RECENT: RecentRecord[] = [
+  {problemId: -1, problemTitle: '짝수의 개수 세기', topic: 'Basic/Introductory', isCorrect: true, solvedAt: new Date(Date.now() - 2 * 3600000).toISOString()},
+  {problemId: -2, problemTitle: '그래프의 연결 요소 개수', topic: 'DFS/BFS', isCorrect: false, solvedAt: new Date(Date.now() - 26 * 3600000).toISOString()},
+  {problemId: -3, problemTitle: '피보나치 수 (DP)', topic: 'Dynamic Programming', isCorrect: true, solvedAt: new Date(Date.now() - 3 * 86400000).toISOString()},
+  {problemId: -4, problemTitle: '배열의 합 구하기', topic: 'Basic/Introductory', isCorrect: true, solvedAt: new Date(Date.now() - 5 * 86400000).toISOString()},
+];
+
+// solvedAt(ISO) → "방금 전 / N시간 전 / N일 전"
+function formatRelative(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return '방금 전';
+  if (min < 60) return `${min}분 전`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}시간 전`;
+  return `${Math.floor(hr / 24)}일 전`;
+}
 
 const TOPIC_ICONS: {label: string; icon: string; progress: number}[] = [
   {label: '알고리즘 마스터', icon: 'account-tree', progress: 45},
@@ -25,6 +45,7 @@ export default function HomeScreen() {
   const [todaySolved, setTodaySolved] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [rec, setRec] = useState<RecommendationResponse | null>(null);
+  const [recent, setRecent] = useState<RecentRecord[]>([]);
   const todaySet = getTodaySet();
   const insets = useSafeAreaInsets();
   const {colors, fontScale} = useTheme();
@@ -46,6 +67,10 @@ export default function HomeScreen() {
       try {
         setRec(await recommendationApi.get(5));
       } catch {}
+      try {
+        const stats = await statsApi.getMyStats();
+        setRecent(stats.recentRecords ?? []);
+      } catch {}
     }
   };
 
@@ -55,6 +80,8 @@ export default function HomeScreen() {
   };
 
   const summary = rec?.summary;
+  // 실 기록이 있으면 사용, 없으면 데모용 가짜 데이터
+  const displayRecent = recent.length > 0 ? recent : MOCK_RECENT;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, {paddingTop: insets.top + 20}]}>
@@ -199,6 +226,27 @@ export default function HomeScreen() {
         ))}
       </View>
 
+      {/* 최근 활동 */}
+      {displayRecent.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>최근 활동</Text>
+          {displayRecent.map((r, i) => (
+            <View key={i} style={styles.activityItem}>
+              <MaterialIcons
+                name={r.isCorrect ? 'check-circle' : 'cancel'}
+                size={22}
+                color={r.isCorrect ? '#4CAF50' : '#F44336'}
+                style={styles.activityIcon}
+              />
+              <View style={styles.activityInfo}>
+                <Text style={styles.activityTitle} numberOfLines={1}>{r.problemTitle}</Text>
+                <Text style={styles.activityMeta}>{r.topic} · {formatRelative(r.solvedAt)}</Text>
+              </View>
+            </View>
+          ))}
+        </>
+      )}
+
       {/* 비로그인 안내 */}
       {!isLoggedIn && (
         <TouchableOpacity style={styles.loginBanner} onPress={() => navigation.navigate('Login')}>
@@ -306,5 +354,15 @@ function makeStyles(c: Colors, fs: number) {
       borderRadius: 10, padding: 16, gap: 10,
     },
     loginBannerText: {flex: 1, fontSize: 13 * fs, color: c.subText},
+
+    // 최근 활동
+    activityItem: {
+      flexDirection: 'row', alignItems: 'center', backgroundColor: c.card,
+      borderRadius: 10, padding: 14, marginBottom: 8,
+    },
+    activityIcon: {marginRight: 12},
+    activityInfo: {flex: 1},
+    activityTitle: {fontSize: 14 * fs, fontWeight: '600', color: c.text},
+    activityMeta: {fontSize: 12 * fs, color: c.subText, marginTop: 2},
   });
 }
