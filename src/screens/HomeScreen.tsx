@@ -16,6 +16,7 @@ const DIFFICULTY_COLOR: Record<string, string> = {
   고급: '#F44336',
 };
 
+//주석확인
 const TOPIC_ICONS: {label: string; icon: string; progress: number}[] = [
   {label: '알고리즘 마스터', icon: 'account-tree', progress: 45},
   {label: '자료구조 연구소', icon: 'data-object', progress: 72},
