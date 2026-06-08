@@ -16,7 +16,8 @@ import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme, type Colors} from '../theme/ThemeContext';
 import type {RootStackParamList} from '../navigation/AppNavigator';
-import {signup} from '../api/authApi';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {signup, login} from '../api/authApi';
 
 export default function SignupScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -42,9 +43,12 @@ export default function SignupScreen() {
     setLoading(true);
     try {
       await signup(email.trim(), password, name.trim(), passwordConfirm);
-      Alert.alert('가입 완료', '회원가입이 완료되었습니다. 로그인해주세요.', [
-        {text: '확인', onPress: () => navigation.goBack()},
+      const {accessToken, refreshToken} = await login(email.trim(), password);
+      await AsyncStorage.multiSet([
+        ['accessToken', accessToken],
+        ['refreshToken', refreshToken],
       ]);
+      navigation.replace('Onboarding');
     } catch (e: any) {
       Alert.alert('회원가입 실패', e.message || '다시 시도해주세요.');
     } finally {

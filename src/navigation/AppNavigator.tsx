@@ -11,14 +11,18 @@ import ProfileScreen from '../screens/ProfileScreen';
 import ProblemSolveScreen from '../screens/ProblemSolveScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
+import OnboardingResultScreen from '../screens/OnboardingResultScreen';
 import {useTheme} from '../theme/ThemeContext';
 
 export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
+  Onboarding: undefined;
+  OnboardingResult: {difficulty: string; reason: string; focusPoint: string};
   Main: undefined;
-  // 세트 ID + 문제 인덱스 전달 (단일 문제 → 세트 전체로 변경)
-  ProblemSolve: {setId: string; initialIndex?: number};
+  // problemId가 있으면 백엔드 실 문제 풀이, 없으면 setId 기반 목 데모
+  ProblemSolve: {setId?: string; problemId?: number; initialIndex?: number};
 };
 
 export type TabParamList = {
@@ -87,6 +91,8 @@ export default function AppNavigator() {
       <Stack.Navigator screenOptions={{headerShown: false}} initialRouteName="Main">
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Signup" component={SignupScreen} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        <Stack.Screen name="OnboardingResult" component={OnboardingResultScreen} />
         <Stack.Screen name="Main" component={TabNavigator} />
         <Stack.Screen name="ProblemSolve" component={ProblemSolveScreen} />
       </Stack.Navigator>
