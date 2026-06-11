@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useState} from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, ScrollView} from 'react-native';
+import {View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -10,6 +10,7 @@ import {useTheme, type Colors} from '../theme/ThemeContext';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {recommendationApi, type RecommendationResponse} from '../api/recommendationApi';
+import {problemApi} from '../api/problemApi';
 import {statsApi, type RecentRecord} from '../api/statsApi';
 import {TYPE_LABEL, difficultyLabel, difficultyColor} from '../types/problem';
 
@@ -74,9 +75,29 @@ export default function HomeScreen() {
     }
   };
 
-  const handleStartSet = () => {
-    if (!todaySet) {return;}
-    navigation.navigate('ProblemSolve', {setId: todaySet.id, initialIndex: 0});
+  const [starting, setStarting] = useState(false);
+
+  // 세트 시작: 백엔드가 안 푼 DB 문제 우선, 없으면 즉석 생성해서 줌
+  const handleStartSet = async () => {
+    if (starting) {return;}
+    const token = await AsyncStorage.getItem('accessToken');
+    if (!token) {
+      navigation.navigate('Login');
+      return;
+    }
+    setStarting(true);
+    try {
+      const problems = await problemApi.startSet(4);
+      if (!problems || problems.length === 0) {
+        Alert.alert('준비 중', '문제를 준비하지 못했어요. 잠시 후 다시 시도해주세요.');
+        return;
+      }
+      navigation.navigate('ProblemSolve', {problems});
+    } catch (e: any) {
+      Alert.alert('오류', e?.message || '서버 오류이거나 네트워크 문제예요.');
+    } finally {
+      setStarting(false);
+    }
   };
 
   const summary = rec?.summary;
@@ -134,13 +155,23 @@ export default function HomeScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.solveButton, todaySolved && styles.solveButtonDone]}
-            onPress={handleStartSet}>
+            style={[styles.solveButton, todaySolved && styles.solveButtonDone, starting && {opacity: 0.7}]}
+            onPress={handleStartSet}
+            disabled={starting}>
             <View style={styles.solveButtonInner}>
-              <MaterialIcons name={todaySolved ? 'check-circle' : 'emoji-events'} size={18} color="#FFF" />
-              <Text style={styles.solveButtonText}>
-                {todaySolved ? '완료 · 다시 풀기' : '세트 시작하기'}
-              </Text>
+              {starting ? (
+                <>
+                  <ActivityIndicator color="#FFF" />
+                  <Text style={styles.solveButtonText}>문제 준비 중...</Text>
+                </>
+              ) : (
+                <>
+                  <MaterialIcons name={todaySolved ? 'check-circle' : 'emoji-events'} size={18} color="#FFF" />
+                  <Text style={styles.solveButtonText}>
+                    {todaySolved ? '완료 · 다시 풀기' : '세트 시작하기'}
+                  </Text>
+                </>
+              )}
             </View>
           </TouchableOpacity>
         </View>

@@ -152,43 +152,64 @@ function findInlineComment(line: string, lang: 'python' | 'javascript'): number 
   return -1;
 }
 
-// 코드 부분만 줄바꿈 (주석 없는 순수 코드 줄에만 적용)
+// 코드 줄바꿈(nesting 정렬): 긴 줄을 '최상위 여는 괄호' 바로 뒤에 맞춰 정렬(hanging indent)하고,
+// 괄호 안 최상위(depth 1) 콤마 뒤 / 최상위(depth 0) 논리연산자(and·or·&&·||) 앞에서 끊는다.
 function wrapCodePart(line: string, maxChars: number): string[] {
   if (measureWidth(line) <= maxChars) {return [line];}
 
-  const leadingSpaces = line.match(/^(\s*)/)?.[1] ?? '';
-  const contPrefix = leadingSpaces + '    ';
+  const leading = line.match(/^\s*/)?.[0] ?? '';
 
-  const result: string[] = [];
-  let chunk = line;
-  let first = true;
-
-  while (chunk.length > 0) {
-    const prefix = first ? '' : contPrefix;
-    const content = first ? chunk : chunk.trimStart();
-    const available = maxChars - measureWidth(prefix);
-
-    if (measureWidth(content) <= available) {
-      result.push(prefix + content);
-      break;
+  // 정렬 칸 = 최상위 여는 괄호 바로 뒤. 없거나 너무 깊으면 들여쓰기+4로 폴백
+  let alignCol = leading.length + 4;
+  let depth = 0;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '(' || ch === '[' || ch === '{') {
+      if (depth === 0) {alignCol = i + 1;}
+      depth++;
+    } else if (ch === ')' || ch === ']' || ch === '}') {
+      depth--;
     }
-
-    let breakAt = 0;
-    let w = 0;
-    for (let i = 0; i < content.length; i++) {
-      const cw = measureWidth(content[i]);
-      if (w + cw > available) {breakAt = i; break;}
-      w += cw;
-    }
-    if (breakAt === 0) {breakAt = content.length;}
-    for (let i = breakAt; i > Math.max(breakAt - 30, 1); i--) {
-      if (' ,('.includes(content[i])) {breakAt = i + 1; break;}
-    }
-
-    result.push((prefix + content.slice(0, breakAt)).trimEnd());
-    chunk = content.slice(breakAt);
-    first = false;
   }
+  if (alignCol > maxChars - 12) {alignCol = leading.length + 4;}
+  const cont = ' '.repeat(alignCol);
+
+  // 끊을 위치 수집
+  const breaks: number[] = [];
+  depth = 0;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '(' || ch === '[' || ch === '{') {depth++;}
+    else if (ch === ')' || ch === ']' || ch === '}') {depth--;}
+    else if (ch === ',' && depth === 1) {breaks.push(i + 1);}                       // 콤마 뒤
+    else if (depth === 0 && ch === ' ' && /^\s+(and|or|&&|\|\|)\s/.test(line.slice(i))) {
+      breaks.push(i);                                                              // 논리연산자 앞
+    }
+  }
+
+  // 세그먼트 분할
+  const segs: string[] = [];
+  let prev = 0;
+  for (const b of breaks) {
+    if (b > prev) {segs.push(line.slice(prev, b)); prev = b;}
+  }
+  segs.push(line.slice(prev));
+
+  // maxChars에 맞춰 욕심껏 채우고, 넘으면 정렬 칸에서 새 줄
+  const result: string[] = [];
+  let buf = '';
+  for (let k = 0; k < segs.length; k++) {
+    const raw = segs[k];
+    if (buf === '') {
+      buf = k === 0 ? raw : cont + raw.replace(/^\s+/, '');
+    } else if (measureWidth(buf + raw) <= maxChars) {
+      buf += raw;
+    } else {
+      result.push(buf.replace(/\s+$/, ''));
+      buf = cont + raw.replace(/^\s+/, '');
+    }
+  }
+  if (buf !== '') {result.push(buf.replace(/\s+$/, ''));}
 
   return result;
 }
@@ -211,9 +232,79 @@ function wrapLine(line: string, maxChars: number, lang: 'python' | 'javascript')
   return wrapCodePart(line, maxChars);
 }
 
+// 괄호 균형(문자열/주석 무시). >0이면 식이 아직 안 닫힘.
+function bracketDepth(s: string): number {
+  let d = 0;
+  let inStr = false;
+  let q = '';
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (ch === q && s[i - 1] !== '\\') {inStr = false;}
+      continue;
+    }
+    if (ch === '"' || ch === "'") {inStr = true; q = ch; continue;}
+    if (ch === '#') {break;}
+    if (ch === '(' || ch === '[' || ch === '{') {d++;}
+    else if (ch === ')' || ch === ']' || ch === '}') {d--;}
+  }
+  return d;
+}
+
+// 식 한복판에서 끊긴 물리적 줄을 논리적 줄로 합친다(저장된 코드에 박힌 줄바꿈 정리).
+function reflow(code: string): string[] {
+  const out: string[] = [];
+  let buf = '';
+  for (const line of code.split('\n')) {
+    buf = buf === '' ? line : buf.replace(/\s+$/, '') + line.replace(/^\s+/, '');
+    if (bracketDepth(buf) <= 0) {
+      out.push(buf);
+      buf = '';
+    }
+  }
+  if (buf !== '') {out.push(buf);}
+  return out;
+}
+
 function detectLanguage(code: string): 'python' | 'javascript' {
   if (/\bdef\b|\bfrom\s+\w+\s+import\b/.test(code)) {return 'python';}
   return 'javascript';
+}
+
+// Python 블록 들여쓰기 재정렬: ':'로 끝나면 다음 줄부터 +1단(4칸),
+// else/elif/except/finally는 한 단 내려서 정렬, return/pass/break/continue/raise 뒤엔 한 단 빠짐.
+function reindentPython(code: string): string {
+  const dedentStart = /^(else|elif|except|finally|case|default)\b/;
+  const dedentAfter = /^(return|pass|break|continue|raise)\b/;
+  const out: string[] = [];
+  let indent = 0;
+  for (const raw of code.split('\n')) {
+    const line = raw.trim();
+    if (line === '') {out.push(''); continue;}
+    let ind = indent;
+    if (dedentStart.test(line)) {ind = Math.max(0, indent - 1);}
+    out.push('    '.repeat(ind) + line);
+    const noComment = line.replace(/#.*$/, '').trimEnd();
+    if (noComment.endsWith(':')) {
+      indent = (dedentStart.test(line) ? ind : indent) + 1;
+    } else if (dedentAfter.test(line)) {
+      indent = Math.max(0, indent - 1);
+    }
+  }
+  return out.join('\n');
+}
+
+// 편집란(TextInput) 등에서 코드를 '정렬': Python이면 블록 들여쓰기 재정렬 후
+// 식 줄 합치고(reflow) 긴 줄을 정렬 줄바꿈한다.
+// language를 명시하면 자동감지(detectLanguage) 대신 그걸 쓴다 — 구현 문제의 본문 조각처럼
+// 'def'가 없어 오판되는 경우를 막기 위함. ('Python'/'Java'/'C++' 모두 허용)
+export function formatCode(code: string, maxChars = 42, language?: string): string {
+  const isPython = language ? /python/i.test(language) : detectLanguage(code) === 'python';
+  const lang: 'python' | 'javascript' = isPython ? 'python' : 'javascript';
+  const src = isPython ? reindentPython(code) : code;
+  return reflow(src)
+    .flatMap(line => wrapLine(line, maxChars, lang))
+    .join('\n');
 }
 
 export default function CodeBlock({
@@ -233,7 +324,7 @@ export default function CodeBlock({
   // padding 32 (양쪽 16씩) 제외
   const maxChars = Math.floor((width - 32) / (fontSize * 0.605));
 
-  const visualLines = code.split('\n').flatMap(line => wrapLine(line, maxChars, lang));
+  const visualLines = reflow(code).flatMap(line => wrapLine(line, maxChars, lang));
 
   return (
     <View style={{backgroundColor: '#1E1E2E', borderRadius: 10, padding: 16, marginBottom: 20}}>

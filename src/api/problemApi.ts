@@ -50,4 +50,8 @@ export const problemApi = {
   // 풀이 제출 → 채점 + 기록 (인증 필요)
   attempt: (id: number, answer: unknown, timeSpentSec?: number) =>
     api.post<AttemptResult>(`/api/problems/${id}/attempt`, {answer, timeSpentSec}),
+
+  // 세트 시작 (인증 필요) → 안 푼 DB 문제 우선, 없으면 즉석 생성. 문제 배열(정답 숨김) 반환
+  startSet: (count = 3) =>
+    api.post<Problem[]>(`/api/problems/start-set?count=${count}`, {}),
 };

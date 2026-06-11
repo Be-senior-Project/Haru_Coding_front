@@ -13,7 +13,7 @@ import type {Problem} from '../types/problem';
 import {TYPE_LABEL, toCodeLang} from '../types/problem';
 import {problemApi} from '../api/problemApi';
 import {useTheme, type Colors} from '../theme/ThemeContext';
-import CodeBlock from '../components/CodeBlock';
+import CodeBlock, {formatCode} from '../components/CodeBlock';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 type RouteProps = RouteProp<RootStackParamList, 'ProblemSolve'>;
@@ -42,13 +42,18 @@ export default function ProblemSolveScreen() {
   const {colors, fontScale} = useTheme();
   const styles = useMemo(() => makeStyles(colors, fontScale), [colors, fontScale]);
 
-  const isReal = route.params.problemId != null;
+  // AI 생성문제(배열)가 전달되면 그대로 사용. problemId면 백엔드 단건 로드.
+  // 둘 다 DB 실 문제(정답 숨김)라 백엔드 채점(attempt)을 쓴다.
+  const passedProblems = route.params.problems;
+  const isReal = route.params.problemId != null || (passedProblems?.length ?? 0) > 0;
 
   // 목 데모용 세트
   const mockSet = problemSets.find(s => s.id === route.params.setId) ?? problemSets[0];
 
-  const [problems, setProblems] = useState<Problem[]>(isReal ? [] : mockSet.problems);
-  const [loading, setLoading] = useState(isReal);
+  const [problems, setProblems] = useState<Problem[]>(
+    passedProblems ?? (route.params.problemId != null ? [] : mockSet.problems),
+  );
+  const [loading, setLoading] = useState(route.params.problemId != null && !passedProblems);
   const [loadError, setLoadError] = useState(false);
 
   const [currentIndex, setCurrentIndex] = useState(route.params.initialIndex ?? 0);
@@ -68,9 +73,9 @@ export default function ProblemSolveScreen() {
 
   const problem: Problem | undefined = problems[currentIndex];
 
-  // 실 문제 로드
+  // 실 문제 로드 (problemId 단건일 때만; 생성문제 배열은 이미 state에 있음)
   useEffect(() => {
-    if (!isReal) return;
+    if (route.params.problemId == null) return;
     let alive = true;
     setLoading(true);
     problemApi
@@ -97,6 +102,7 @@ export default function ProblemSolveScreen() {
       setCodeAnswer('');
     } else {
       setFillAnswers([]);
+      // 디버깅: 원본 코드 그대로(들여쓰기=로직이라 자동 재정렬 금지). 버그 코드 그대로 보여줘야 함.
       setCodeAnswer(problem.type === 'DEBUGGING' ? (problem.codeSkeleton ?? '') : '');
     }
     setSubmitted(false);
@@ -261,12 +267,20 @@ export default function ProblemSolveScreen() {
           }
         />
       ) : (
-        <CodeAnswer
-          value={codeAnswer}
-          submitted={submitted}
-          placeholder={problem.type === 'DEBUGGING' ? '코드를 수정하세요' : '코드를 작성하세요'}
-          onChange={setCodeAnswer}
-        />
+        <>
+          <TouchableOpacity
+            style={[styles.fmtBtn, submitted && styles.btnDisabled]}
+            onPress={() => setCodeAnswer(formatCode(codeAnswer, 42, problem.language))}
+            disabled={submitted}>
+            <Text style={styles.fmtBtnText}>⟲ 코드 정렬</Text>
+          </TouchableOpacity>
+          <CodeAnswer
+            value={codeAnswer}
+            submitted={submitted}
+            placeholder={problem.type === 'DEBUGGING' ? '코드를 수정하세요' : '코드를 작성하세요'}
+            onChange={setCodeAnswer}
+          />
+        </>
       )}
 
       {!submitted ? (
@@ -395,6 +409,11 @@ function makeStyles(c: Colors, fs: number) {
       padding: 14, fontSize: 14 * fs, backgroundColor: c.card, color: c.text,
       fontFamily: 'monospace',
     },
+    fmtBtn: {
+      alignSelf: 'flex-end', backgroundColor: c.isDark ? '#1A1F3A' : '#EEF2FF',
+      borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginBottom: 8,
+    },
+    fmtBtnText: {color: '#2979FF', fontSize: 13 * fs, fontWeight: '700'},
     codeInput: {
       borderWidth: 1, borderColor: c.border, borderRadius: 10,
       padding: 14, fontSize: 13 * fs, backgroundColor: c.card, color: c.text,

@@ -14,6 +14,7 @@ import SignupScreen from '../screens/SignupScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import OnboardingResultScreen from '../screens/OnboardingResultScreen';
 import {useTheme} from '../theme/ThemeContext';
+import type {Problem} from '../types/problem';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -21,8 +22,8 @@ export type RootStackParamList = {
   Onboarding: undefined;
   OnboardingResult: {difficulty: string; reason: string; focusPoint: string};
   Main: undefined;
-  // problemId가 있으면 백엔드 실 문제 풀이, 없으면 setId 기반 목 데모
-  ProblemSolve: {setId?: string; problemId?: number; initialIndex?: number};
+  // problems: AI 생성문제 직접 전달 / problemId: 백엔드 실 문제 1개 / setId: 목 데모
+  ProblemSolve: {setId?: string; problemId?: number; initialIndex?: number; problems?: Problem[]};
 };
 
 export type TabParamList = {
